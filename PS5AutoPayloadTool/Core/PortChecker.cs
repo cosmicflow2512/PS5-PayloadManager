@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Sockets;
 
 namespace PS5AutoPayloadTool.Core;
@@ -10,7 +11,8 @@ public static class PortChecker
         try
         {
             using var client = new TcpClient();
-            var connectTask = client.ConnectAsync(host, port).AsTask();
+            // ConnectAsync(string, int) returns Task — no .AsTask() needed
+            var connectTask = client.ConnectAsync(host, port);
             var winner = await Task.WhenAny(connectTask, Task.Delay(timeoutMs));
             return winner == connectTask && !connectTask.IsFaulted;
         }
@@ -42,7 +44,7 @@ public static class PortChecker
             bool open = await CheckPortAsync(host, port, perCheckTimeoutMs);
             if (open) return true;
 
-            try { progress?.Report($"Waiting for port {port} on {host}…"); } catch { }
+            try { progress?.Report($"Waiting for port {port} on {host}..."); } catch { }
 
             await Task.Delay(intervalMs, cancellationToken);
         }
@@ -66,7 +68,7 @@ public static class PortChecker
             bool open = await CheckPortAsync(host, port, 1_000);
             if (open) return;
 
-            try { progress?.Report($"Waiting for port {port} on {host}…"); } catch { }
+            try { progress?.Report($"Waiting for port {port} on {host}..."); } catch { }
             await Task.Delay(intervalMs, cancellationToken);
         }
     }

@@ -11,8 +11,8 @@ public static class PayloadSender
 
     /// <summary>
     /// Returns the default port for a given filename:
-    /// .lua → 9026 (Lua/Userland loader)
-    /// .elf / .bin → 9021 (ELF loader)
+    /// .lua  -> 9026 (Lua/Userland loader)
+    /// .elf / .bin -> 9021 (ELF loader)
     /// </summary>
     public static int GetDefaultPort(string filename)
     {
@@ -41,8 +41,12 @@ public static class PayloadSender
         {
             using var client = new TcpClient();
 
-            var connectTask = client.ConnectAsync(host, port, cancellationToken).AsTask();
-            if (!connectTask.Wait(timeoutMs, cancellationToken))
+            // ConnectAsync(string, int) returns Task — use WhenAny for timeout
+            var connectTask = client.ConnectAsync(host, port);
+            var timeoutTask = Task.Delay(timeoutMs, cancellationToken);
+            var winner = await Task.WhenAny(connectTask, timeoutTask);
+
+            if (winner == timeoutTask)
                 return new(false, $"Connection timeout to {host}:{port}", 0);
 
             if (connectTask.IsFaulted)
