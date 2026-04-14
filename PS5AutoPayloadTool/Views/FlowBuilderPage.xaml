@@ -1,0 +1,314 @@
+<UserControl x:Class="PS5AutoPayloadTool.Views.FlowBuilderPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:PS5AutoPayloadTool.Views">
+
+    <UserControl.Resources>
+        <local:StringToBrushConverter x:Key="StringToBrush"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="24,20,24,10">
+
+                <!-- ── Header ─────────────────────────────────────────── -->
+                <TextBlock Text="Auto-Load Flow Builder"
+                           Style="{StaticResource PageTitle}"/>
+
+                <!-- ── Connection Row ────────────────────────────────── -->
+                <Border Style="{StaticResource Card}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="160"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="PS5 IP:"
+                                   Foreground="{StaticResource FgSubtle}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        <TextBox Grid.Column="1"
+                                 x:Name="TxtPS5Host"
+                                 TextChanged="TxtPS5Host_TextChanged"/>
+
+                        <StackPanel Grid.Column="2"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Margin="14,0">
+                            <Ellipse x:Name="EllipseLua"
+                                     Width="9" Height="9"
+                                     Fill="{StaticResource BgOverlay}"
+                                     Margin="0,0,5,0"/>
+                            <TextBlock Text="Lua 9026"
+                                       Foreground="{StaticResource FgSubtle}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,12,0"/>
+                            <Ellipse x:Name="EllipseElf"
+                                     Width="9" Height="9"
+                                     Fill="{StaticResource BgOverlay}"
+                                     Margin="0,0,5,0"/>
+                            <TextBlock Text="ELF 9021"
+                                       Foreground="{StaticResource FgSubtle}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <Button Grid.Column="4"
+                                Content="Check Ports"
+                                Style="{StaticResource Btn}"
+                                Click="BtnCheckPorts_Click"/>
+                    </Grid>
+                </Border>
+
+                <!-- ── Flow Steps ─────────────────────────────────────── -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Flow Steps"
+                                   Style="{StaticResource SectionTitle}"/>
+
+                        <TextBlock x:Name="TxtFlowEmpty"
+                                   Text="No steps yet. Use the sections below to add steps."
+                                   Foreground="{StaticResource FgSubtle}"
+                                   FontSize="12"
+                                   Margin="0,0,0,8"
+                                   Visibility="Visible"/>
+
+                        <ItemsControl x:Name="FlowStepsList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource BgBase}"
+                                            BorderBrush="{StaticResource BgSurface}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="10,8"
+                                            Margin="0,0,0,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Type badge -->
+                                            <Border Grid.Column="0"
+                                                    Background="#313244"
+                                                    CornerRadius="4"
+                                                    Padding="6,2"
+                                                    Margin="0,0,10,0"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding TypeLabel}"
+                                                           Foreground="{Binding TypeColor, Converter={StaticResource StringToBrush}}"
+                                                           FontSize="10"
+                                                           FontWeight="SemiBold"/>
+                                            </Border>
+
+                                            <!-- Display text -->
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding DisplayText}"
+                                                       Foreground="{StaticResource FgMain}"
+                                                       FontSize="12"
+                                                       FontFamily="Consolas"
+                                                       VerticalAlignment="Center"/>
+
+                                            <!-- Controls -->
+                                            <StackPanel Grid.Column="2"
+                                                        Orientation="Horizontal"
+                                                        VerticalAlignment="Center">
+                                                <Button Content="▲"
+                                                        Style="{StaticResource Btn}"
+                                                        Padding="6,2"
+                                                        Margin="0,0,2,0"
+                                                        FontSize="10"
+                                                        Tag="{Binding}"
+                                                        Click="BtnMoveUp_Click"/>
+                                                <Button Content="▼"
+                                                        Style="{StaticResource Btn}"
+                                                        Padding="6,2"
+                                                        Margin="0,0,2,0"
+                                                        FontSize="10"
+                                                        Tag="{Binding}"
+                                                        Click="BtnMoveDown_Click"/>
+                                                <Button Content="✕"
+                                                        Style="{StaticResource BtnDanger}"
+                                                        Padding="6,2"
+                                                        FontSize="10"
+                                                        Tag="{Binding}"
+                                                        Click="BtnRemoveStep_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Add Payload Step ──────────────────────────────── -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="+ Payload Step"
+                                   Style="{StaticResource SectionTitle}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Payload"
+                                           Foreground="{StaticResource FgSubtle}"
+                                           FontSize="11" Margin="0,0,0,4"/>
+                                <ComboBox x:Name="CmbPayloadStep"
+                                          DisplayMemberPath="Name"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Port"
+                                           Foreground="{StaticResource FgSubtle}"
+                                           FontSize="11" Margin="0,0,0,4"/>
+                                <TextBox x:Name="TxtPayloadPort" Text="9021"/>
+                            </StackPanel>
+
+                            <Button Grid.Column="4"
+                                    Content="Add"
+                                    Style="{StaticResource BtnAccent}"
+                                    VerticalAlignment="Bottom"
+                                    Click="BtnAddPayloadStep_Click"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Add Wait Step ─────────────────────────────────── -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="+ Wait Step"
+                                   Style="{StaticResource SectionTitle}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Port"
+                                           Foreground="{StaticResource FgSubtle}"
+                                           FontSize="11" Margin="0,0,0,4"/>
+                                <TextBox x:Name="TxtWaitPort" Text="9021"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Timeout (seconds)"
+                                           Foreground="{StaticResource FgSubtle}"
+                                           FontSize="11" Margin="0,0,0,4"/>
+                                <TextBox x:Name="TxtWaitTimeout" Text="60"/>
+                            </StackPanel>
+
+                            <Button Grid.Column="4"
+                                    Content="Add"
+                                    Style="{StaticResource BtnYellow}"
+                                    VerticalAlignment="Bottom"
+                                    Click="BtnAddWaitStep_Click"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Add Delay Step ────────────────────────────────── -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="+ Delay Step"
+                                   Style="{StaticResource SectionTitle}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Delay (milliseconds)"
+                                           Foreground="{StaticResource FgSubtle}"
+                                           FontSize="11" Margin="0,0,0,4"/>
+                                <TextBox x:Name="TxtDelayMs" Text="500"/>
+                            </StackPanel>
+
+                            <Button Grid.Column="2"
+                                    Content="Add"
+                                    Style="{StaticResource BtnGreen}"
+                                    VerticalAlignment="Bottom"
+                                    Click="BtnAddDelayStep_Click"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ── Bottom Control Bar ────────────────────────────────────── -->
+        <Border Grid.Row="1"
+                Background="{StaticResource BgMantle}"
+                BorderBrush="{StaticResource BgSurface}"
+                BorderThickness="0,1,0,0"
+                Padding="24,12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0"
+                            Orientation="Horizontal"
+                            Margin="0,0,0,8">
+                    <Button Content="Save as Profile"
+                            Style="{StaticResource Btn}"
+                            Margin="0,0,8,0"
+                            Click="BtnSaveProfile_Click"/>
+                    <Button x:Name="BtnRun"
+                            Content="&#x25B6;  Run Flow"
+                            Style="{StaticResource BtnGreen}"
+                            Margin="0,0,8,0"
+                            Click="BtnRunFlow_Click"/>
+                    <Button x:Name="BtnStop"
+                            Content="&#x25A0;  Stop"
+                            Style="{StaticResource BtnRed}"
+                            IsEnabled="False"
+                            Click="BtnStopFlow_Click"/>
+                </StackPanel>
+
+                <ProgressBar Grid.Row="1"
+                             x:Name="PrgFlow"
+                             Minimum="0" Maximum="100"
+                             Value="0"
+                             Margin="0,0,0,6"/>
+
+                <TextBlock Grid.Row="2"
+                           x:Name="TxtFlowLog"
+                           Text=""
+                           Foreground="{StaticResource FgSubtle}"
+                           FontSize="11"
+                           FontFamily="Consolas"
+                           TextWrapping="Wrap"
+                           MaxHeight="48"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+
+</UserControl>
