@@ -3,7 +3,7 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*'          # triggers on v1.0.0, v1.1.0, etc.
+      - '*'           # triggers on any tag: v1.0.0, 1.0.0, etc.
   workflow_dispatch:  # allows manual trigger from GitHub UI
 
 jobs:
