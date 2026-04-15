@@ -14,21 +14,121 @@
                 <StackPanel>
                     <TextBlock Text="GENERAL" Style="{StaticResource SectionTitle}"/>
 
-                    <TextBlock Text="PS5 IP Address"
-                               Foreground="{StaticResource FgSubtle}"
-                               FontSize="12" Margin="0,0,0,4"/>
-                    <TextBox x:Name="TxtHost" Margin="0,0,0,12"
-                             TextChanged="TxtHost_TextChanged"/>
-
                     <TextBlock Text="GitHub Token (optional — increases API rate limit)"
                                Foreground="{StaticResource FgSubtle}"
                                FontSize="12" Margin="0,0,0,4"/>
-                    <TextBox x:Name="TxtToken" Margin="0,0,0,12"
+                    <TextBox x:Name="TxtToken" Margin="0,0,0,8"
                              TextChanged="TxtToken_TextChanged"/>
 
                     <TextBlock Text="Leave GitHub Token empty if you don't have one."
                                Foreground="{StaticResource FgSubtle}"
                                FontSize="11" FontStyle="Italic"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ── PS5 Devices ──────────────────────────────────────── -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="PS5 DEVICES"
+                                   Style="{StaticResource SectionTitle}"
+                                   VerticalAlignment="Center"
+                                   Margin="0"/>
+                        <Button Grid.Column="1"
+                                Content="+ Add Device"
+                                Style="{StaticResource BtnAccent}"
+                                Padding="10,4"
+                                Click="BtnAddDevice_Click"/>
+                    </Grid>
+
+                    <!-- Device list -->
+                    <ItemsControl x:Name="DevicesList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource BgBase}"
+                                        BorderBrush="{StaticResource BgSurface}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="10,8"
+                                        Margin="0,0,0,6">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       Foreground="{StaticResource FgMain}"
+                                                       FontSize="12" FontFamily="Consolas"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1"
+                                                Content="Remove"
+                                                Style="{StaticResource BtnDanger}"
+                                                Padding="8,3" FontSize="11"
+                                                Tag="{Binding}"
+                                                Click="BtnRemoveDevice_Click"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Empty state for devices -->
+                    <TextBlock x:Name="TxtNoDevices"
+                               Text="No devices added. Click '+ Add Device' to add your PS5."
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="12" FontStyle="Italic"
+                               Margin="0,4,0,0"
+                               Visibility="Collapsed"/>
+
+                    <!-- Add device form (inline) -->
+                    <Border x:Name="AddDeviceForm"
+                            Visibility="Collapsed"
+                            Background="{StaticResource BgBase}"
+                            BorderBrush="{StaticResource BgSurface}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12,10"
+                            Margin="0,8,0,0">
+                        <StackPanel>
+                            <TextBlock Text="New Device"
+                                       Foreground="{StaticResource FgSubtle}"
+                                       FontSize="11" FontWeight="SemiBold"
+                                       Margin="0,0,0,8"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="160"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Name (optional)"
+                                               Foreground="{StaticResource FgSubtle}"
+                                               FontSize="11" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtDeviceName"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="IP Address"
+                                               Foreground="{StaticResource FgSubtle}"
+                                               FontSize="11" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtDeviceIp"/>
+                                </StackPanel>
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Content="Save Device"
+                                        Style="{StaticResource BtnAccent}"
+                                        Margin="0,0,8,0"
+                                        Click="BtnSaveDevice_Click"/>
+                                <Button Content="Cancel"
+                                        Style="{StaticResource Btn}"
+                                        Click="BtnCancelDevice_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Border>
 

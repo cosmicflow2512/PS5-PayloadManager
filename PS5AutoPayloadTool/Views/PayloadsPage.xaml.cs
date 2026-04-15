@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Win32;
 using PS5AutoPayloadTool.Core;
 using PS5AutoPayloadTool.Models;
 
@@ -20,15 +21,54 @@ public partial class PayloadsPage : UserControl
         _items.Clear();
         var meta = MainWindow.Config.PayloadMeta;
         if (meta != null)
-        {
             foreach (var kv in meta)
                 if (kv.Value != null)
                     _items.Add(new PayloadEntry(kv.Key, kv.Value));
+
+        EmptyState.Visibility = _items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // ── Add local payload ─────────────────────────────────────────────────────
+
+    private void BtnAddPayload_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title  = "Select Payload File",
+            Filter = "Payload files (*.elf;*.bin;*.lua)|*.elf;*.bin;*.lua|All files (*.*)|*.*",
+            Multiselect = true
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        int added = 0;
+        foreach (var path in dlg.FileNames)
+        {
+            var name = Path.GetFileName(path);
+            var dest = Path.Combine(AppPaths.PayloadsDir, name);
+            Directory.CreateDirectory(AppPaths.PayloadsDir);
+            File.Copy(path, dest, overwrite: true);
+
+            if (!MainWindow.Config.PayloadMeta.ContainsKey(name))
+                MainWindow.Config.PayloadMeta[name] = new PayloadMeta
+                {
+                    Version   = "local",
+                    Versions  = new() { "local" },
+                    LocalPath = dest,
+                    Size      = new FileInfo(dest).Length
+                };
+            else
+            {
+                var m = MainWindow.Config.PayloadMeta[name];
+                m.LocalPath = dest;
+                m.Size      = new FileInfo(dest).Length;
+                if (!m.Versions.Contains("local")) m.Versions.Insert(0, "local");
+            }
+            added++;
         }
 
-        EmptyState.Visibility = _items.Count == 0
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        MainWindow.SaveConfig();
+        PopulateList();
+        TxtStatus.Text = $"Added {added} payload(s).";
     }
 
     // ── Check All Updates ────────────────────────────────────────────────────
@@ -36,38 +76,30 @@ public partial class PayloadsPage : UserControl
     private async void BtnCheckAll_Click(object sender, RoutedEventArgs e)
     {
         TxtStatus.Text = "Checking for updates...";
-
         var tasks = new List<Task>();
+
         foreach (var source in MainWindow.Config.Sources)
         {
             var src = source;
-            var progress = new Progress<string>(msg =>
-                Dispatcher.Invoke(() => TxtStatus.Text = msg));
-
             tasks.Add(Task.Run(async () =>
             {
                 try
                 {
-                    var found = await MainWindow.PayloadMgr.ScanSourceAsync(src, progress);
+                    var found = await MainWindow.PayloadMgr.ScanSourceAsync(src);
                     Dispatcher.Invoke(() =>
                     {
-                        foreach (var (name, url, version, size) in found)
+                        foreach (var (name, _, version, size) in found)
                         {
                             if (!MainWindow.Config.PayloadMeta.ContainsKey(name))
-                            {
                                 MainWindow.Config.PayloadMeta[name] = new PayloadMeta
-                                {
-                                    SourceUrl = src.Url,
-                                    Versions  = new() { version },
-                                    Version   = version,
-                                    Size      = size
-                                };
-                            }
+                                    { SourceUrl = src.Url, Versions = new() { version }, Version = version, Size = size };
                             else
                             {
                                 var meta = MainWindow.Config.PayloadMeta[name];
-                                if (!meta.Versions.Contains(version))
-                                    meta.Versions.Add(version);
+                                if (!meta.Versions.Contains(version)) meta.Versions.Add(version);
+                                // Mark update available if latest differs from current
+                                if (meta.Versions.Count > 0 && meta.Versions[^1] != meta.Version)
+                                    meta.HasUpdateAvailable = true;
                             }
                         }
                     });
@@ -85,7 +117,59 @@ public partial class PayloadsPage : UserControl
         PopulateList();
     }
 
-    // ── Download ─────────────────────────────────────────────────────────────
+    // ── Update All ───────────────────────────────────────────────────────────
+
+    private async void BtnUpdateAll_Click(object sender, RoutedEventArgs e)
+    {
+        TxtStatus.Text = "Updating all payloads...";
+        PrgDownload.Value = 0;
+        PrgDownload.Visibility = Visibility.Visible;
+
+        int updated = 0;
+        int total   = _items.Count;
+
+        foreach (var entry in _items.ToList())
+        {
+            if (string.IsNullOrEmpty(entry.Meta.SourceUrl)) continue;
+
+            var source = MainWindow.Config.Sources
+                .FirstOrDefault(s => s.Url == entry.Meta.SourceUrl);
+            if (source == null) continue;
+
+            try
+            {
+                var found  = await MainWindow.PayloadMgr.ScanSourceAsync(source);
+                var latest = found.FirstOrDefault(f => f.Name == entry.Name);
+                if (latest == default) continue;
+
+                entry.StatusText = $"Downloading {latest.Version}...";
+
+                await MainWindow.PayloadMgr.DownloadAsync(
+                    MainWindow.Config, entry.Name, latest.DownloadUrl,
+                    latest.Version, source.Url);
+
+                entry.Meta.Version           = latest.Version;
+                entry.Meta.HasUpdateAvailable = false;
+                entry.StatusText = $"Updated to {latest.Version}";
+                updated++;
+            }
+            catch (Exception ex)
+            {
+                entry.StatusText = $"Error: {ex.Message}";
+            }
+
+            Dispatcher.Invoke(() =>
+                PrgDownload.Value = (double)updated / Math.Max(total, 1) * 100.0);
+        }
+
+        MainWindow.SaveConfig();
+        TxtStatus.Text = $"Updated {updated} payload(s).";
+        await Task.Delay(1500);
+        PrgDownload.Visibility = Visibility.Collapsed;
+        PopulateList();
+    }
+
+    // ── Download specific version ─────────────────────────────────────────────
 
     private async void BtnDownload_Click(object sender, RoutedEventArgs e)
     {
@@ -93,13 +177,18 @@ public partial class PayloadsPage : UserControl
         var selectedVersion = entry.SelectedVersion;
         if (string.IsNullOrEmpty(selectedVersion)) return;
 
+        if (selectedVersion == "local")
+        {
+            entry.StatusText = "Local payload — nothing to download.";
+            return;
+        }
+
         entry.StatusText = "Downloading...";
         PrgDownload.Value = 0;
         PrgDownload.Visibility = Visibility.Visible;
 
         try
         {
-            // Find download URL from scan
             var source = MainWindow.Config.Sources
                 .FirstOrDefault(s => s.Url == entry.Meta.SourceUrl);
             if (source == null) { entry.StatusText = "Source not found."; return; }
@@ -114,7 +203,7 @@ public partial class PayloadsPage : UserControl
                     if (p.Item2 > 0)
                     {
                         PrgDownload.Value = (double)p.Item1 / p.Item2 * 100.0;
-                        entry.StatusText = $"{p.Item1 * 100 / p.Item2}%";
+                        entry.StatusText  = $"{p.Item1 * 100 / p.Item2}%";
                     }
                 }));
 
@@ -127,10 +216,7 @@ public partial class PayloadsPage : UserControl
             PrgDownload.Value = 100;
             PopulateList();
         }
-        catch (Exception ex)
-        {
-            entry.StatusText = $"Error: {ex.Message}";
-        }
+        catch (Exception ex) { entry.StatusText = $"Error: {ex.Message}"; }
         finally
         {
             await Task.Delay(1500);
@@ -144,20 +230,12 @@ public partial class PayloadsPage : UserControl
     {
         if ((sender as Button)?.DataContext is not PayloadEntry entry) return;
 
-        var result = MessageBox.Show(
-            $"Remove \"{entry.Name}\" from the payload list?\n\nThe local file will also be deleted if it exists.",
-            "Confirm Delete",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-
-        if (result != MessageBoxResult.Yes) return;
+        if (MessageBox.Show($"Remove \"{entry.Name}\"?\n\nThe local file will also be deleted.",
+                "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Question)
+            != MessageBoxResult.Yes) return;
 
         var path = Path.Combine(AppPaths.PayloadsDir, entry.Name);
-        if (File.Exists(path))
-        {
-            try { File.Delete(path); }
-            catch { /* ignore */ }
-        }
+        if (File.Exists(path)) try { File.Delete(path); } catch { }
 
         MainWindow.Config.PayloadMeta.Remove(entry.Name);
         MainWindow.SaveConfig();
@@ -166,27 +244,36 @@ public partial class PayloadsPage : UserControl
     }
 }
 
-/// <summary>View-model wrapper for a PayloadMeta entry.</summary>
+/// <summary>View-model for a PayloadMeta entry.</summary>
 public class PayloadEntry : System.ComponentModel.INotifyPropertyChanged
 {
-    public PayloadEntry(string name, PayloadMeta meta) { Name = name; Meta = meta; SelectedVersion = meta.Version; }
+    public PayloadEntry(string name, PayloadMeta meta)
+    {
+        Name            = name;
+        Meta            = meta;
+        SelectedVersion = meta.Version;
+    }
 
-    public string Name { get; }
-    public PayloadMeta Meta { get; }
+    public string      Name             { get; }
+    public PayloadMeta Meta             { get; }
     public List<string> AvailableVersions => Meta.Versions;
-    public string? CurrentVersion => Meta.Version;
-    public string SelectedVersion { get; set; }
-    public bool IsDownloaded => Meta.IsDownloaded;
-
-    // Expose Id so XAML Tag="{Binding Id}" still binds (Id = Name)
-    public string Id => Name;
+    public string?     CurrentVersion   => Meta.Version;
+    public string      SelectedVersion  { get; set; }
+    public bool        IsDownloaded     => Meta.IsDownloaded;
+    public bool        HasUpdate        => Meta.HasUpdateAvailable;
+    public string      Id               => Name;
 
     private string _statusText = "";
     public string StatusText
     {
         get => _statusText;
-        set { _statusText = value; PropertyChanged?.Invoke(this, new(nameof(StatusText))); }
+        set { _statusText = value; OnChanged(nameof(StatusText)); OnChanged(nameof(HasStatus)); }
     }
+
+    public bool HasStatus => !string.IsNullOrEmpty(_statusText);
+
+    private void OnChanged(string prop) =>
+        PropertyChanged?.Invoke(this, new(prop));
 
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 }

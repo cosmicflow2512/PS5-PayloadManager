@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using PS5AutoPayloadTool.Core;
@@ -9,6 +10,7 @@ namespace PS5AutoPayloadTool.Views;
 public partial class SourcesPage : UserControl
 {
     private readonly ObservableCollection<SourceConfig> _sources = new();
+    private string? _editingId;
 
     public SourcesPage()
     {
@@ -16,201 +18,154 @@ public partial class SourcesPage : UserControl
         SourcesList.ItemsSource = _sources;
     }
 
-    // Called by MainWindow when this page becomes active
     public void Refresh() => PopulateList();
-
-    // ── List population ──────────────────────────────────────────────────────
 
     private void PopulateList()
     {
         _sources.Clear();
         foreach (var s in MainWindow.Config.Sources)
             _sources.Add(s);
-
-        EmptyState.Visibility = _sources.Count == 0
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        EmptyState.Visibility = _sources.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    // ── Toggle add form ──────────────────────────────────────────────────────
+    private static string? ParseRepoUrl(string input)
+    {
+        input = input.Trim().TrimEnd('/');
+        var m = Regex.Match(input,
+            @"(?:https?://)?(?:www\.)?github\.com/([^/\s]+)/([^/\s]+)",
+            RegexOptions.IgnoreCase);
+        if (m.Success)
+            return $"https://github.com/{m.Groups[1].Value}/{m.Groups[2].Value}";
+        m = Regex.Match(input, @"^([^/\s]+)/([^/\s]+)$");
+        if (m.Success)
+            return $"https://github.com/{m.Groups[1].Value}/{m.Groups[2].Value}";
+        return null;
+    }
 
     private void BtnToggleAdd_Click(object sender, RoutedEventArgs e)
     {
-        AddForm.Visibility = AddForm.Visibility == Visibility.Visible
-            ? Visibility.Collapsed
-            : Visibility.Visible;
-
-        if (AddForm.Visibility == Visibility.Visible)
-        {
-            TxtOwner.Text  = "";
-            TxtRepo.Text   = "";
-            TxtFilter.Text = "";
-            TxtFolder.Text = "";
-            CmbType.SelectedIndex = 0;
-            FolderPathPanel.Visibility = Visibility.Collapsed;
-        }
+        if (AddForm.Visibility == Visibility.Visible) CloseForm();
+        else OpenForm(null);
     }
 
-    private void BtnCancelAdd_Click(object sender, RoutedEventArgs e)
+    private void OpenForm(SourceConfig? existing)
     {
-        AddForm.Visibility = Visibility.Collapsed;
-        TxtStatus.Text     = "";
+        _editingId = existing?.Id;
+        FormTitle.Text = existing == null ? "Add New Source" : "Edit Source";
+        BtnScanAdd.Content = existing == null ? "Scan & Save" : "Rescan & Save";
+        TxtRepoUrl.Text = existing?.Url ?? "";
+        TxtFilter.Text  = existing?.Filter ?? "";
+        TxtFolder.Text  = existing?.FolderPath ?? "";
+        CmbType.SelectedIndex = existing?.Type == "folder" ? 1 : 0;
+        FolderPathPanel.Visibility = CmbType.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
+        AddForm.Visibility = Visibility.Visible;
+        TxtStatus.Text = "";
     }
 
-    // ── ComboBox changed: show/hide folder path field ────────────────────────
+    private void CloseForm()
+    {
+        _editingId = null;
+        AddForm.Visibility = Visibility.Collapsed;
+        TxtStatus.Text = "";
+    }
+
+    private void BtnCancelAdd_Click(object sender, RoutedEventArgs e) => CloseForm();
 
     private void CmbType_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (FolderPathPanel == null) return;
-        FolderPathPanel.Visibility = CmbType.SelectedIndex == 1
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        FolderPathPanel.Visibility = CmbType.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
     }
-
-    // ── Scan & Add ───────────────────────────────────────────────────────────
 
     private async void BtnScanAdd_Click(object sender, RoutedEventArgs e)
     {
-        var owner  = TxtOwner.Text.Trim();
-        var repo   = TxtRepo.Text.Trim();
-        var type   = (CmbType.SelectedIndex == 1) ? "folder" : "release";
-        var filter = TxtFilter.Text.Trim();
-        var folder = TxtFolder.Text.Trim();
-
-        if (string.IsNullOrEmpty(owner) || string.IsNullOrEmpty(repo))
+        var url = ParseRepoUrl(TxtRepoUrl.Text);
+        if (url == null)
         {
-            TxtStatus.Text = "Owner and Repo are required.";
+            TxtStatus.Text = "Invalid repo. Use: owner/repo  or  https://github.com/owner/repo";
             return;
         }
 
         var source = new SourceConfig
         {
-            Url        = $"https://github.com/{owner}/{repo}",
-            Type       = type,
-            Filter     = filter,
-            FolderPath = folder
+            Url        = url,
+            Type       = CmbType.SelectedIndex == 1 ? "folder" : "release",
+            Filter     = TxtFilter.Text.Trim(),
+            FolderPath = TxtFolder.Text.Trim()
         };
 
         TxtStatus.Text = $"Scanning {source.DisplayName}...";
         BtnScanAdd.IsEnabled = false;
-
-        var progress = new Progress<string>(msg =>
-            Dispatcher.Invoke(() => TxtStatus.Text = msg));
+        var progress = new Progress<string>(msg => Dispatcher.Invoke(() => TxtStatus.Text = msg));
 
         try
         {
-            var found = await MainWindow.PayloadMgr.ScanSourceAsync(
-                source, progress, CancellationToken.None);
+            var found = await MainWindow.PayloadMgr.ScanSourceAsync(source, progress, CancellationToken.None);
 
-            // Add source if not already present (match by URL)
+            if (_editingId != null)
+                MainWindow.Config.Sources.RemoveAll(s => s.Id == _editingId);
             if (!MainWindow.Config.Sources.Any(s => s.Url == source.Url))
                 MainWindow.Config.Sources.Add(source);
 
-            // Add/update payload_meta entries
-            foreach (var (name, url, version, size) in found)
+            foreach (var (name, _, version, size) in found)
             {
                 if (!MainWindow.Config.PayloadMeta.ContainsKey(name))
-                {
                     MainWindow.Config.PayloadMeta[name] = new PayloadMeta
-                    {
-                        SourceUrl = source.Url,
-                        Versions  = new() { version },
-                        Version   = version,
-                        Size      = size
-                    };
-                }
-                else
-                {
-                    var meta = MainWindow.Config.PayloadMeta[name];
-                    if (!meta.Versions.Contains(version))
-                        meta.Versions.Add(version);
-                }
+                        { SourceUrl = source.Url, Versions = new() { version }, Version = version, Size = size };
+                else if (!MainWindow.Config.PayloadMeta[name].Versions.Contains(version))
+                    MainWindow.Config.PayloadMeta[name].Versions.Add(version);
             }
 
             MainWindow.SaveConfig();
             PopulateList();
-            AddForm.Visibility = Visibility.Collapsed;
-            TxtStatus.Text = $"Found {found.Count} payload(s). Source added.";
+            CloseForm();
+            TxtStatus.Text = $"Found {found.Count} payload(s). Source saved.";
         }
-        catch (Exception ex)
-        {
-            TxtStatus.Text = $"Error: {ex.Message}";
-        }
-        finally
-        {
-            BtnScanAdd.IsEnabled = true;
-        }
+        catch (Exception ex) { TxtStatus.Text = $"Error: {ex.Message}"; }
+        finally { BtnScanAdd.IsEnabled = true; }
     }
-
-    // ── Rescan ───────────────────────────────────────────────────────────────
 
     private async void BtnRescan_Click(object sender, RoutedEventArgs e)
     {
-        // Tag is bound to Id which equals Url in SourceConfig
         if (sender is not Button btn || btn.Tag is not string id) return;
-
         var source = MainWindow.Config.Sources.FirstOrDefault(s => s.Id == id);
         if (source == null) return;
 
         TxtStatus.Text = $"Rescanning {source.DisplayName}...";
-
-        var progress = new Progress<string>(msg =>
-            Dispatcher.Invoke(() => TxtStatus.Text = msg));
-
+        var progress = new Progress<string>(msg => Dispatcher.Invoke(() => TxtStatus.Text = msg));
         try
         {
-            var found = await MainWindow.PayloadMgr.ScanSourceAsync(
-                source, progress, CancellationToken.None);
-
-            foreach (var (name, url, version, size) in found)
+            var found = await MainWindow.PayloadMgr.ScanSourceAsync(source, progress, CancellationToken.None);
+            foreach (var (name, _, version, size) in found)
             {
                 if (!MainWindow.Config.PayloadMeta.ContainsKey(name))
-                {
                     MainWindow.Config.PayloadMeta[name] = new PayloadMeta
-                    {
-                        SourceUrl = source.Url,
-                        Versions  = new() { version },
-                        Version   = version,
-                        Size      = size
-                    };
-                }
-                else
-                {
-                    var meta = MainWindow.Config.PayloadMeta[name];
-                    if (!meta.Versions.Contains(version))
-                        meta.Versions.Add(version);
-                }
+                        { SourceUrl = source.Url, Versions = new() { version }, Version = version, Size = size };
+                else if (!MainWindow.Config.PayloadMeta[name].Versions.Contains(version))
+                    MainWindow.Config.PayloadMeta[name].Versions.Add(version);
             }
-
             MainWindow.SaveConfig();
-            TxtStatus.Text = $"Rescan complete — {found.Count} payload(s) found.";
+            TxtStatus.Text = $"Rescan complete — {found.Count} payload(s).";
         }
-        catch (Exception ex)
-        {
-            TxtStatus.Text = $"Error: {ex.Message}";
-        }
+        catch (Exception ex) { TxtStatus.Text = $"Error: {ex.Message}"; }
     }
 
-    // ── Remove source ────────────────────────────────────────────────────────
+    private void BtnEditSource_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not string id) return;
+        var source = MainWindow.Config.Sources.FirstOrDefault(s => s.Id == id);
+        if (source != null) OpenForm(source);
+    }
 
     private void BtnRemoveSource_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button btn || btn.Tag is not string id) return;
-
         var source = MainWindow.Config.Sources.FirstOrDefault(s => s.Id == id);
         if (source == null) return;
-
-        var result = MessageBox.Show(
-            $"Remove source \"{source.DisplayName}\"?",
-            "Confirm Remove",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-
-        if (result != MessageBoxResult.Yes) return;
-
+        if (MessageBox.Show($"Remove \"{source.DisplayName}\"?", "Confirm Remove",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         MainWindow.Config.Sources.RemoveAll(s => s.Id == id);
         MainWindow.SaveConfig();
-
         TxtStatus.Text = $"Removed {source.DisplayName}.";
         PopulateList();
     }

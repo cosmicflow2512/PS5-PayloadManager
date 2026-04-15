@@ -12,6 +12,7 @@ public partial class FlowBuilderPage : UserControl
 {
     private readonly ObservableCollection<BuilderStep> _steps = new();
     private readonly ExecEngine _engine = new();
+    private bool _loading;
 
     private static readonly SolidColorBrush _dotOff = new(Color.FromRgb(69,  71,  90));
     private static readonly SolidColorBrush _dotOn  = new(Color.FromRgb(166, 227, 161));
@@ -26,7 +27,21 @@ public partial class FlowBuilderPage : UserControl
 
     public void Refresh()
     {
-        TxtPS5Host.Text = MainWindow.Config.PS5Host;
+        _loading = true;
+
+        // Flow name
+        TxtFlowName.Text = MainWindow.Config.State.BuilderProfileName;
+
+        // Device dropdown
+        var devices = MainWindow.Config.Devices;
+        CmbDevice.ItemsSource = null;
+        CmbDevice.ItemsSource = devices;
+
+        // Select the saved device, or default to first
+        var selectedIp = MainWindow.Config.State.SelectedDeviceIp;
+        var selected = devices.FirstOrDefault(d => d.Ip == selectedIp)
+                    ?? devices.FirstOrDefault();
+        CmbDevice.SelectedItem = selected;
 
         // Reload steps from config
         _steps.Clear();
@@ -40,6 +55,7 @@ public partial class FlowBuilderPage : UserControl
             CmbPayloadStep.SelectedIndex = 0;
 
         UpdateEmptyHint();
+        _loading = false;
     }
 
     private void UpdateEmptyHint()
@@ -49,18 +65,40 @@ public partial class FlowBuilderPage : UserControl
             : Visibility.Collapsed;
     }
 
-    // ── PS5 host text box ────────────────────────────────────────────────────
-
-    private void TxtPS5Host_TextChanged(object sender, TextChangedEventArgs e)
+    private string GetSelectedHost()
     {
-        MainWindow.Config.PS5Host = TxtPS5Host.Text.Trim();
+        if (CmbDevice.SelectedItem is DeviceConfig dev)
+            return dev.Ip;
+        return MainWindow.Config.PS5Host;
+    }
+
+    // ── Flow name ────────────────────────────────────────────────────────────
+
+    private void TxtFlowName_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_loading) return;
+        MainWindow.Config.State.BuilderProfileName = TxtFlowName.Text.Trim();
+        MainWindow.SaveConfig();
+    }
+
+    // ── Device selection ─────────────────────────────────────────────────────
+
+    private void CmbDevice_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        if (CmbDevice.SelectedItem is DeviceConfig dev)
+        {
+            MainWindow.Config.PS5Host = dev.Ip;
+            MainWindow.Config.State.SelectedDeviceIp = dev.Ip;
+            MainWindow.SaveConfig();
+        }
     }
 
     // ── Check ports ──────────────────────────────────────────────────────────
 
     private async void BtnCheckPorts_Click(object sender, RoutedEventArgs e)
     {
-        var host = TxtPS5Host.Text.Trim();
+        var host = GetSelectedHost();
         var luaTask = PortChecker.CheckPortAsync(host, 9026, 2_000);
         var elfTask = PortChecker.CheckPortAsync(host, 9021, 2_000);
         await Task.WhenAll(luaTask, elfTask);
@@ -74,7 +112,7 @@ public partial class FlowBuilderPage : UserControl
         if (Window.GetWindow(this) is MainWindow mw)
             mw.SetPortIndicators(luaOpen, elfOpen);
 
-        TxtFlowLog.Text = $"Lua 9026: {(luaOpen ? "OPEN" : "closed")}   ELF 9021: {(elfOpen ? "OPEN" : "closed")}";
+        AppendLog($"Lua 9026: {(luaOpen ? "OPEN" : "closed")}   ELF 9021: {(elfOpen ? "OPEN" : "closed")}");
     }
 
     // ── Add steps ────────────────────────────────────────────────────────────
@@ -84,7 +122,7 @@ public partial class FlowBuilderPage : UserControl
         var name = CmbPayloadStep.SelectedItem?.ToString()?.Trim() ?? "";
         if (string.IsNullOrEmpty(name))
         {
-            TxtFlowLog.Text = "Select a payload first.";
+            AppendLog("Select a payload first.");
             return;
         }
 
@@ -152,7 +190,7 @@ public partial class FlowBuilderPage : UserControl
     {
         if (_steps.Count == 0)
         {
-            TxtFlowLog.Text = "Flow is empty — nothing to save.";
+            AppendLog("Flow is empty — nothing to save.");
             return;
         }
 
@@ -163,7 +201,7 @@ public partial class FlowBuilderPage : UserControl
         File.WriteAllText(path, content);
         MainWindow.Config.Profiles[name] = content;
         MainWindow.SaveConfig();
-        TxtFlowLog.Text = $"Saved profile: {name}";
+        AppendLog($"Saved profile: {name}");
     }
 
     // ── Run / Stop ───────────────────────────────────────────────────────────
@@ -172,11 +210,11 @@ public partial class FlowBuilderPage : UserControl
     {
         if (_steps.Count == 0)
         {
-            TxtFlowLog.Text = "Flow is empty — nothing to run.";
+            AppendLog("Flow is empty — nothing to run.");
             return;
         }
 
-        var host = TxtPS5Host.Text.Trim();
+        var host = GetSelectedHost();
         MainWindow.Config.PS5Host = host;
 
         var directives = _steps.Select(s => s.ToProfileLine())
@@ -209,7 +247,7 @@ public partial class FlowBuilderPage : UserControl
     {
         Dispatcher.Invoke(() =>
         {
-            TxtFlowLog.Text = e.Message;
+            AppendLog(e.Message);
 
             if (e.TotalSteps > 0 && e.StepIndex >= 0)
                 PrgFlow.Value = (double)e.StepIndex / e.TotalSteps * 100.0;
@@ -226,6 +264,14 @@ public partial class FlowBuilderPage : UserControl
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private void AppendLog(string message)
+    {
+        TxtFlowLog.Text = string.IsNullOrEmpty(TxtFlowLog.Text)
+            ? message
+            : TxtFlowLog.Text + "\n" + message;
+        LogScroll.ScrollToBottom();
+    }
 
     private void SyncFlowToConfig()
     {
