@@ -14,8 +14,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="Payload Sources"
                            Style="{StaticResource PageTitle}"
-                           VerticalAlignment="Center"
-                           Margin="0"/>
+                           VerticalAlignment="Center" Margin="0"/>
                 <Button Grid.Column="1"
                         x:Name="BtnToggleAdd"
                         Content="+ Add Source"
@@ -23,13 +22,24 @@
                         Click="BtnToggleAdd_Click"/>
             </Grid>
 
-            <!-- ── Add Source Form (collapsed by default) ──────────────── -->
+            <!-- ── Add / Edit Source Form ───────────────────────────────── -->
             <Border x:Name="AddForm"
                     Visibility="Collapsed"
                     Style="{StaticResource Card}"
                     Margin="0,0,0,16">
                 <StackPanel>
-                    <TextBlock Text="Add New Source" Style="{StaticResource SectionTitle}"/>
+                    <TextBlock x:Name="FormTitle"
+                               Text="Add New Source"
+                               Style="{StaticResource SectionTitle}"/>
+
+                    <!-- Single URL input -->
+                    <StackPanel Margin="0,0,0,10">
+                        <TextBlock Text="Repository  (https://github.com/owner/repo  or  owner/repo)"
+                                   Foreground="{StaticResource FgSubtle}"
+                                   FontSize="11" Margin="0,0,0,4"/>
+                        <TextBox x:Name="TxtRepoUrl"
+                                 FontFamily="Consolas"/>
+                    </StackPanel>
 
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
@@ -37,42 +47,30 @@
                             <ColumnDefinition Width="12"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
+
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="GitHub Owner"
+                            <TextBlock Text="Source Type"
                                        Foreground="{StaticResource FgSubtle}"
                                        FontSize="11" Margin="0,0,0,4"/>
-                            <TextBox x:Name="TxtOwner"/>
+                            <ComboBox x:Name="CmbType"
+                                      SelectionChanged="CmbType_SelectionChanged">
+                                <ComboBoxItem Content="GitHub Releases" IsSelected="True"/>
+                                <ComboBoxItem Content="GitHub Folder"/>
+                            </ComboBox>
                         </StackPanel>
+
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="Repository"
+                            <TextBlock Text="File filter  (e.g. *.elf)"
                                        Foreground="{StaticResource FgSubtle}"
                                        FontSize="11" Margin="0,0,0,4"/>
-                            <TextBox x:Name="TxtRepo"/>
+                            <TextBox x:Name="TxtFilter"/>
                         </StackPanel>
                     </Grid>
-
-                    <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="Source Type"
-                                   Foreground="{StaticResource FgSubtle}"
-                                   FontSize="11" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="CmbType"
-                                  SelectionChanged="CmbType_SelectionChanged">
-                            <ComboBoxItem Content="GitHub Releases" IsSelected="True"/>
-                            <ComboBoxItem Content="GitHub Folder"/>
-                        </ComboBox>
-                    </StackPanel>
-
-                    <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="File filter (e.g. *.elf)"
-                                   Foreground="{StaticResource FgSubtle}"
-                                   FontSize="11" Margin="0,0,0,4"/>
-                        <TextBox x:Name="TxtFilter"/>
-                    </StackPanel>
 
                     <StackPanel x:Name="FolderPathPanel"
                                 Visibility="Collapsed"
                                 Margin="0,0,0,10">
-                        <TextBlock Text="Folder path (for folder type)"
+                        <TextBlock Text="Folder path within repository"
                                    Foreground="{StaticResource FgSubtle}"
                                    FontSize="11" Margin="0,0,0,4"/>
                         <TextBox x:Name="TxtFolder"/>
@@ -80,7 +78,7 @@
 
                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                         <Button x:Name="BtnScanAdd"
-                                Content="Scan &amp; Add"
+                                Content="Scan &amp; Save"
                                 Style="{StaticResource BtnAccent}"
                                 Margin="0,0,8,0"
                                 Click="BtnScanAdd_Click"/>
@@ -91,13 +89,10 @@
                 </StackPanel>
             </Border>
 
-            <!-- ── Status line ─────────────────────────────────────────── -->
+            <!-- ── Status ──────────────────────────────────────────────── -->
             <TextBlock x:Name="TxtStatus"
-                       Text=""
-                       Foreground="{StaticResource FgSubtle}"
-                       FontSize="12"
-                       Margin="0,0,0,10"
-                       TextWrapping="Wrap"/>
+                       Text="" Foreground="{StaticResource FgSubtle}"
+                       FontSize="12" Margin="0,0,0,10" TextWrapping="Wrap"/>
 
             <!-- ── Sources list ─────────────────────────────────────────── -->
             <ItemsControl x:Name="SourcesList">
@@ -114,21 +109,31 @@
                                                FontWeight="SemiBold"
                                                Foreground="{StaticResource FgMain}"
                                                FontSize="13"/>
-                                    <TextBlock Text="{Binding Type}"
-                                               Foreground="{StaticResource FgSubtle}"
-                                               FontSize="11" Margin="0,2,0,0"/>
-                                    <TextBlock Text="{Binding Filter}"
-                                               Foreground="{StaticResource FgSubtle}"
-                                               FontSize="11" Margin="0,1,0,0"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                        <TextBlock Text="{Binding Type}"
+                                                   Foreground="{StaticResource FgSubtle}"
+                                                   FontSize="11"/>
+                                        <TextBlock Text=" · "
+                                                   Foreground="{StaticResource FgSubtle}"
+                                                   FontSize="11"/>
+                                        <TextBlock Text="{Binding Filter}"
+                                                   Foreground="{StaticResource FgSubtle}"
+                                                   FontSize="11"/>
+                                    </StackPanel>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
                                             VerticalAlignment="Center">
                                     <Button Content="Rescan"
                                             Style="{StaticResource Btn}"
-                                            Margin="0,0,6,0" Padding="10,4"
+                                            Padding="10,4" Margin="0,0,6,0"
                                             Tag="{Binding Id}"
                                             Click="BtnRescan_Click"/>
+                                    <Button Content="Edit"
+                                            Style="{StaticResource BtnAccent}"
+                                            Padding="10,4" Margin="0,0,6,0"
+                                            Tag="{Binding Id}"
+                                            Click="BtnEditSource_Click"/>
                                     <Button Content="Remove"
                                             Style="{StaticResource BtnDanger}"
                                             Padding="10,4"
@@ -148,14 +153,12 @@
                 <StackPanel HorizontalAlignment="Center" Margin="0,20">
                     <TextBlock Text="No sources added yet"
                                Foreground="{StaticResource FgSubtle}"
-                               HorizontalAlignment="Center"
-                               FontSize="14"/>
-                    <TextBlock Text="Click '+ Add Source' to add a GitHub repository as a payload source."
+                               HorizontalAlignment="Center" FontSize="14"/>
+                    <TextBlock Text="Click '+ Add Source' to add a GitHub repository."
                                Foreground="{StaticResource FgSubtle}"
                                HorizontalAlignment="Center"
                                FontSize="12" Margin="0,6,0,0"
-                               TextWrapping="Wrap"
-                               MaxWidth="400"
+                               TextWrapping="Wrap" MaxWidth="400"
                                TextAlignment="Center"/>
                 </StackPanel>
             </Border>

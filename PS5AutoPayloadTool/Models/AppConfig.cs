@@ -62,7 +62,10 @@ public class AppState
     public List<BuilderStep> BuilderSteps { get; set; } = new();
 
     [JsonPropertyName("builder_profile_name")]
-    public string BuilderProfileName { get; set; } = "";
+    public string BuilderProfileName { get; set; } = "My Flow";
+
+    [JsonPropertyName("selected_device_ip")]
+    public string SelectedDeviceIp { get; set; } = "";
 
     [JsonPropertyName("payload_filter")]
     public string PayloadFilter { get; set; } = "";
@@ -148,12 +151,21 @@ public class PayloadMeta
 
     [JsonIgnore]
     public bool IsDownloaded => !string.IsNullOrEmpty(LocalPath) && File.Exists(LocalPath);
+
+    [JsonIgnore]
+    public bool HasUpdateAvailable { get; set; } = false;
 }
 
 public class DeviceConfig
 {
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
     [JsonPropertyName("ip")]
     public string Ip { get; set; } = "192.168.1.100";
+
+    [JsonIgnore]
+    public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Ip : $"{Name}  ({Ip})";
 }
 
 public class BuilderStep

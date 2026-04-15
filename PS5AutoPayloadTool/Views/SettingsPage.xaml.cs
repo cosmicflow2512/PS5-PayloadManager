@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
 using PS5AutoPayloadTool.Core;
+using PS5AutoPayloadTool.Models;
 
 namespace PS5AutoPayloadTool.Views;
 
@@ -20,13 +21,16 @@ public partial class SettingsPage : UserControl
     public void Refresh()
     {
         _loading = true;
-        TxtHost.Text  = MainWindow.Config.PS5Host;
         TxtToken.Text = MainWindow.Config.GitHubToken;
         TxtDataPath.Text = AppPaths.Base;
 
+        RefreshDevices();
+
         // Stats
-        var payloadCount = Directory.GetFiles(AppPaths.PayloadsDir).Length;
-        var profileCount = Directory.GetFiles(AppPaths.ProfilesDir, "*.txt").Length;
+        var payloadCount = Directory.Exists(AppPaths.PayloadsDir)
+            ? Directory.GetFiles(AppPaths.PayloadsDir).Length : 0;
+        var profileCount = Directory.Exists(AppPaths.ProfilesDir)
+            ? Directory.GetFiles(AppPaths.ProfilesDir, "*.txt").Length : 0;
         long cacheBytes  = GetDirSize(AppPaths.CacheDir);
         TxtStats.Text = $"{payloadCount} payload(s)  •  {profileCount} profile(s)  •  cache {FormatBytes(cacheBytes)}";
 
@@ -34,14 +38,15 @@ public partial class SettingsPage : UserControl
         TxtStatus.Text = "";
     }
 
-    // ── Inputs ───────────────────────────────────────────────────────────────
-
-    private void TxtHost_TextChanged(object sender, TextChangedEventArgs e)
+    private void RefreshDevices()
     {
-        if (_loading) return;
-        MainWindow.Config.PS5Host = TxtHost.Text.Trim();
-        SaveAndNotify();
+        var devices = MainWindow.Config.Devices;
+        DevicesList.ItemsSource = null;
+        DevicesList.ItemsSource = devices;
+        TxtNoDevices.Visibility = devices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    // ── Inputs ───────────────────────────────────────────────────────────────
 
     private void TxtToken_TextChanged(object sender, TextChangedEventArgs e)
     {
@@ -54,6 +59,69 @@ public partial class SettingsPage : UserControl
     {
         (Window.GetWindow(this) as MainWindow)?.OnConfigChanged();
         TxtStatus.Text = "Saved.";
+    }
+
+    // ── Device management ────────────────────────────────────────────────────
+
+    private void BtnAddDevice_Click(object sender, RoutedEventArgs e)
+    {
+        TxtDeviceName.Text = "";
+        TxtDeviceIp.Text   = "192.168.1.";
+        AddDeviceForm.Visibility = Visibility.Visible;
+        TxtDeviceIp.Focus();
+    }
+
+    private void BtnSaveDevice_Click(object sender, RoutedEventArgs e)
+    {
+        var ip   = TxtDeviceIp.Text.Trim();
+        var name = TxtDeviceName.Text.Trim();
+
+        if (string.IsNullOrEmpty(ip))
+        {
+            TxtStatus.Text = "IP address is required.";
+            return;
+        }
+
+        // Don't add duplicate IPs
+        if (MainWindow.Config.Devices.Any(d => d.Ip == ip))
+        {
+            TxtStatus.Text = "A device with that IP already exists.";
+            return;
+        }
+
+        MainWindow.Config.Devices.Add(new DeviceConfig { Name = name, Ip = ip });
+
+        // If this is the first device, set it as the active host
+        if (MainWindow.Config.Devices.Count == 1)
+            MainWindow.Config.PS5Host = ip;
+
+        MainWindow.SaveConfig();
+        AddDeviceForm.Visibility = Visibility.Collapsed;
+        RefreshDevices();
+        SaveAndNotify();
+    }
+
+    private void BtnCancelDevice_Click(object sender, RoutedEventArgs e)
+    {
+        AddDeviceForm.Visibility = Visibility.Collapsed;
+    }
+
+    private void BtnRemoveDevice_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.Tag is not DeviceConfig dev) return;
+
+        MainWindow.Config.Devices.Remove(dev);
+
+        // If we removed the active device, switch to first remaining
+        if (MainWindow.Config.PS5Host == dev.Ip)
+        {
+            var next = MainWindow.Config.Devices.FirstOrDefault();
+            MainWindow.Config.PS5Host = next?.Ip ?? "192.168.1.100";
+        }
+
+        MainWindow.SaveConfig();
+        RefreshDevices();
+        SaveAndNotify();
     }
 
     // ── Buttons ──────────────────────────────────────────────────────────────
@@ -123,12 +191,15 @@ public partial class SettingsPage : UserControl
         MainWindow.Config.State.BuilderSteps   = new();
 
         // Clear payload files and profiles
-        foreach (var f in Directory.GetFiles(AppPaths.PayloadsDir))
-            File.Delete(f);
-        foreach (var f in Directory.GetFiles(AppPaths.ProfilesDir))
-            File.Delete(f);
-        foreach (var d in Directory.GetDirectories(AppPaths.CacheDir))
-            Directory.Delete(d, true);
+        if (Directory.Exists(AppPaths.PayloadsDir))
+            foreach (var f in Directory.GetFiles(AppPaths.PayloadsDir))
+                try { File.Delete(f); } catch { }
+        if (Directory.Exists(AppPaths.ProfilesDir))
+            foreach (var f in Directory.GetFiles(AppPaths.ProfilesDir))
+                try { File.Delete(f); } catch { }
+        if (Directory.Exists(AppPaths.CacheDir))
+            foreach (var d in Directory.GetDirectories(AppPaths.CacheDir))
+                try { Directory.Delete(d, true); } catch { }
 
         MainWindow.SaveConfig();
         Refresh();

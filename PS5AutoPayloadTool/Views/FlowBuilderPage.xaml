@@ -19,27 +19,43 @@
             <StackPanel Margin="24,20,24,10">
 
                 <!-- ── Header ─────────────────────────────────────────── -->
-                <TextBlock Text="Auto-Load Flow Builder"
-                           Style="{StaticResource PageTitle}"/>
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Flow Builder"
+                               Style="{StaticResource PageTitle}"
+                               VerticalAlignment="Center"
+                               Margin="0"/>
+                    <TextBox Grid.Column="1"
+                             x:Name="TxtFlowName"
+                             FontSize="16" FontWeight="SemiBold"
+                             Margin="16,0,0,0"
+                             VerticalAlignment="Center"
+                             TextChanged="TxtFlowName_TextChanged"/>
+                </Grid>
 
                 <!-- ── Connection Row ────────────────────────────────── -->
                 <Border Style="{StaticResource Card}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="160"/>
+                            <ColumnDefinition Width="220"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="0" Text="PS5 IP:"
+                        <TextBlock Grid.Column="0" Text="PS5 Device:"
                                    Foreground="{StaticResource FgSubtle}"
                                    VerticalAlignment="Center"
                                    Margin="0,0,8,0"/>
-                        <TextBox Grid.Column="1"
-                                 x:Name="TxtPS5Host"
-                                 TextChanged="TxtPS5Host_TextChanged"/>
+
+                        <ComboBox Grid.Column="1"
+                                  x:Name="CmbDevice"
+                                  DisplayMemberPath="DisplayName"
+                                  SelectionChanged="CmbDevice_SelectionChanged"/>
 
                         <StackPanel Grid.Column="2"
                                     Orientation="Horizontal"
@@ -172,8 +188,7 @@
                                 <TextBlock Text="Payload"
                                            Foreground="{StaticResource FgSubtle}"
                                            FontSize="11" Margin="0,0,0,4"/>
-                                <ComboBox x:Name="CmbPayloadStep"
-                                          DisplayMemberPath="Name"/>
+                                <ComboBox x:Name="CmbPayloadStep"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="2">
@@ -266,16 +281,8 @@
                 BorderBrush="{StaticResource BgSurface}"
                 BorderThickness="0,1,0,0"
                 Padding="24,12">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <StackPanel Grid.Row="0"
-                            Orientation="Horizontal"
-                            Margin="0,0,0,8">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                     <Button Content="Save as Profile"
                             Style="{StaticResource Btn}"
                             Margin="0,0,8,0"
@@ -292,21 +299,30 @@
                             Click="BtnStopFlow_Click"/>
                 </StackPanel>
 
-                <ProgressBar Grid.Row="1"
-                             x:Name="PrgFlow"
+                <ProgressBar x:Name="PrgFlow"
                              Minimum="0" Maximum="100"
                              Value="0"
                              Margin="0,0,0,6"/>
 
-                <TextBlock Grid.Row="2"
-                           x:Name="TxtFlowLog"
-                           Text=""
-                           Foreground="{StaticResource FgSubtle}"
-                           FontSize="11"
-                           FontFamily="Consolas"
-                           TextWrapping="Wrap"
-                           MaxHeight="48"/>
-            </Grid>
+                <!-- Scrollable log -->
+                <Border Background="{StaticResource BgBase}"
+                        BorderBrush="{StaticResource BgSurface}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Height="90">
+                    <ScrollViewer x:Name="LogScroll"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Padding="8,6">
+                        <TextBlock x:Name="TxtFlowLog"
+                                   Text=""
+                                   Foreground="{StaticResource FgSubtle}"
+                                   FontSize="11"
+                                   FontFamily="Consolas"
+                                   TextWrapping="Wrap"/>
+                    </ScrollViewer>
+                </Border>
+            </StackPanel>
         </Border>
 
     </Grid>
