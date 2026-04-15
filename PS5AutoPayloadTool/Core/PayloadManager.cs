@@ -1,200 +1,140 @@
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using PS5AutoPayloadTool.Models;
 
 namespace PS5AutoPayloadTool.Core;
 
-public class PayloadManager
+public class PayloadManager(GitHubClient github)
 {
-    private readonly GitHubClient _github;
-
-    public PayloadManager(GitHubClient github)
+    /// <summary>
+    /// Scans a source and returns (name, downloadUrl, version, size) tuples
+    /// for all payload files found.
+    /// </summary>
+    public async Task<List<(string Name, string DownloadUrl, string Version, long Size)>> ScanSourceAsync(
+        SourceConfig source,
+        IProgress<string>? progress = null,
+        CancellationToken ct = default)
     {
-        _github = github;
-    }
+        var results = new List<(string, string, string, long)>();
 
-    public async Task<List<PayloadItem>> ScanSourceAsync(
-        PayloadSource source,
-        IProgress<string>? progress,
-        CancellationToken ct)
-    {
-        var results = new List<PayloadItem>();
-
-        if (source.Type == SourceType.GitHubRelease)
+        if (source.Type == "release")
         {
-            progress?.Report($"Fetching releases for {source.DisplayName}...");
-            var releases = await _github.GetReleasesAsync(source.Owner, source.Repo);
-
-            // Group assets by name across all releases to build version lists
-            var assetsByName = new Dictionary<string, List<(string version, string url, long size)>>(StringComparer.OrdinalIgnoreCase);
-
+            var releases = await github.GetReleasesAsync(source.Owner, source.Repo);
             foreach (var release in releases)
             {
                 ct.ThrowIfCancellationRequested();
                 foreach (var asset in release.Assets)
                 {
                     if (!GitHubClient.IsPayloadFile(asset.Name)) continue;
-
-                    // Apply filter if provided
-                    if (!string.IsNullOrWhiteSpace(source.Filter))
-                    {
-                        if (!MatchesFilter(asset.Name, source.Filter)) continue;
-                    }
-
-                    if (!assetsByName.TryGetValue(asset.Name, out var versions))
-                    {
-                        versions = new List<(string, string, long)>();
-                        assetsByName[asset.Name] = versions;
-                    }
-
-                    versions.Add((release.TagName, asset.BrowserDownloadUrl, asset.Size));
+                    if (!string.IsNullOrEmpty(source.Filter) &&
+                        !MatchFilter(asset.Name, source.Filter)) continue;
+                    results.Add((asset.Name, asset.BrowserDownloadUrl, release.TagName, asset.Size));
                 }
             }
-
-            foreach (var kvp in assetsByName)
-            {
-                var name = kvp.Key;
-                var versions = kvp.Value;
-                var latestVersion = versions.First();
-
-                var item = new PayloadItem
-                {
-                    SourceId = source.Id,
-                    Name = name,
-                    CurrentVersion = latestVersion.version,
-                    AvailableVersions = versions.Select(v => v.version).Distinct().ToList(),
-                    FileSize = latestVersion.size
-                };
-
-                // Check if already downloaded
-                var localPath = Path.Combine(AppPaths.PayloadsDir, name);
-                if (File.Exists(localPath))
-                    item.LocalPath = localPath;
-
-                results.Add(item);
-                progress?.Report($"Found: {name} ({versions.Count} version(s))");
-            }
         }
-        else if (source.Type == SourceType.GitHubFolder)
+        else // folder
         {
-            progress?.Report($"Fetching folder contents for {source.DisplayName}/{source.FolderPath}...");
-            var contents = await _github.GetFolderContentsAsync(source.Owner, source.Repo, source.FolderPath);
-
-            foreach (var content in contents)
+            var contents = await github.GetFolderContentsAsync(
+                source.Owner, source.Repo, source.FolderPath);
+            foreach (var file in contents)
             {
                 ct.ThrowIfCancellationRequested();
-                if (content.Type != "file") continue;
-                if (!GitHubClient.IsPayloadFile(content.Name)) continue;
-
-                // Apply filter if provided
-                if (!string.IsNullOrWhiteSpace(source.Filter))
-                {
-                    if (!MatchesFilter(content.Name, source.Filter)) continue;
-                }
-
-                var item = new PayloadItem
-                {
-                    SourceId = source.Id,
-                    Name = content.Name,
-                    CurrentVersion = "latest",
-                    AvailableVersions = new List<string> { "latest" },
-                    FileSize = content.Size
-                };
-
-                var localPath = Path.Combine(AppPaths.PayloadsDir, content.Name);
-                if (File.Exists(localPath))
-                    item.LocalPath = localPath;
-
-                results.Add(item);
-                progress?.Report($"Found: {content.Name}");
+                if (file.DownloadUrl == null) continue;
+                if (!GitHubClient.IsPayloadFile(file.Name)) continue;
+                if (!string.IsNullOrEmpty(source.Filter) &&
+                    !MatchFilter(file.Name, source.Filter)) continue;
+                results.Add((file.Name, file.DownloadUrl, "folder", file.Size));
             }
         }
 
+        progress?.Report($"Found {results.Count} payload(s) in {source.DisplayName}");
         return results;
     }
 
-    public async Task DownloadPayloadAsync(
-        PayloadItem item,
+    /// <summary>
+    /// Downloads a payload to cache and updates payload_meta in config.
+    /// </summary>
+    public async Task DownloadAsync(
+        AppConfig config,
+        string name,
+        string downloadUrl,
         string version,
-        IProgress<(long, long)>? progress,
-        CancellationToken ct)
+        string sourceUrl,
+        IProgress<(long, long)>? progress = null,
+        CancellationToken ct = default)
     {
-        // Find the source to get the download URL
-        var config = ConfigManager.Load();
-        var source = config.Sources.FirstOrDefault(s => s.Id == item.SourceId);
-        if (source == null) throw new InvalidOperationException("Source not found for payload item.");
+        // Cache path: CacheDir/name/version/name
+        var versionDir = Path.Combine(AppPaths.CacheDir, name, version);
+        Directory.CreateDirectory(versionDir);
+        var cachePath = Path.Combine(versionDir, name);
 
-        string downloadUrl;
+        if (!File.Exists(cachePath))
+            await github.DownloadFileAsync(downloadUrl, cachePath, progress, ct);
 
-        if (source.Type == SourceType.GitHubRelease)
-        {
-            var releases = await _github.GetReleasesAsync(source.Owner, source.Repo);
-            GhAsset? asset = null;
-
-            foreach (var release in releases)
-            {
-                if (release.TagName == version || (version == "latest" && asset == null))
-                {
-                    asset = release.Assets.FirstOrDefault(a =>
-                        string.Equals(a.Name, item.Name, StringComparison.OrdinalIgnoreCase));
-                    if (release.TagName == version) break;
-                }
-            }
-
-            if (asset == null)
-                throw new InvalidOperationException($"Asset '{item.Name}' not found in release '{version}'.");
-
-            downloadUrl = asset.BrowserDownloadUrl;
-        }
-        else // GitHubFolder
-        {
-            var contents = await _github.GetFolderContentsAsync(source.Owner, source.Repo, source.FolderPath);
-            var content = contents.FirstOrDefault(c =>
-                string.Equals(c.Name, item.Name, StringComparison.OrdinalIgnoreCase));
-
-            if (content == null || string.IsNullOrEmpty(content.DownloadUrl))
-                throw new InvalidOperationException($"File '{item.Name}' not found in folder.");
-
-            downloadUrl = content.DownloadUrl;
-        }
-
-        // Download to cache directory
-        var cacheVersionDir = Path.Combine(AppPaths.CacheDir, item.Name, version);
-        var cachePath = Path.Combine(cacheVersionDir, item.Name);
-        await _github.DownloadFileAsync(downloadUrl, cachePath, progress, ct);
-
-        // Copy to active payloads directory
-        var activePath = Path.Combine(AppPaths.PayloadsDir, item.Name);
+        // Copy to active payloads dir
         Directory.CreateDirectory(AppPaths.PayloadsDir);
+        var activePath = Path.Combine(AppPaths.PayloadsDir, name);
         File.Copy(cachePath, activePath, overwrite: true);
 
-        // Update item properties
-        item.LocalPath = activePath;
-        item.CurrentVersion = version;
-        item.LastUpdated = DateTime.UtcNow;
+        // Update payload_meta
+        if (!config.PayloadMeta.TryGetValue(name, out var meta))
+        {
+            meta = new PayloadMeta { SourceUrl = sourceUrl };
+            config.PayloadMeta[name] = meta;
+        }
+
+        if (!meta.Versions.Contains(version))
+            meta.Versions.Add(version);
+
+        meta.Version   = version;
+        meta.LocalPath = activePath;
+        meta.SourceUrl = sourceUrl;
+        meta.Size      = new FileInfo(activePath).Length;
     }
 
-    private static bool MatchesFilter(string fileName, string filter)
+    /// <summary>
+    /// Legacy overload kept for backward compatibility with PayloadsPage.
+    /// Resolves the download URL by rescanning the source, then delegates to DownloadAsync.
+    /// </summary>
+    public async Task DownloadPayloadAsync(
+        AppConfig config,
+        string name,
+        string version,
+        string sourceUrl,
+        IProgress<(long, long)>? progress = null,
+        CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(filter)) return true;
+        var source = config.Sources.FirstOrDefault(s => s.Url == sourceUrl);
+        if (source == null)
+            throw new InvalidOperationException($"Source not found for URL: {sourceUrl}");
+
+        var found = await ScanSourceAsync(source, null, ct);
+        var match = found.FirstOrDefault(f =>
+            f.Name == name &&
+            (f.Version == version || version == "latest"));
+
+        if (match == default)
+            throw new InvalidOperationException($"Version '{version}' of '{name}' not found in source.");
+
+        await DownloadAsync(config, name, match.DownloadUrl, version, sourceUrl, progress, ct);
+    }
+
+    private static bool MatchFilter(string name, string filter)
+    {
+        if (string.IsNullOrEmpty(filter)) return true;
 
         // Support simple glob patterns like *.elf
-        if (filter.StartsWith("*"))
+        if (filter.StartsWith('*'))
         {
-            var suffix = filter.Substring(1);
-            return fileName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase);
+            var suffix = filter[1..];
+            return name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase);
         }
 
-        if (filter.EndsWith("*"))
+        if (filter.EndsWith('*'))
         {
-            var prefix = filter.Substring(0, filter.Length - 1);
-            return fileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+            var prefix = filter[..^1];
+            return name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
         }
 
-        return fileName.Equals(filter, StringComparison.OrdinalIgnoreCase);
+        return name.Contains(filter, StringComparison.OrdinalIgnoreCase);
     }
 }

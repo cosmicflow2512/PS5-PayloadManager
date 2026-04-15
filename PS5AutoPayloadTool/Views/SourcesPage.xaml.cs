@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using PS5AutoPayloadTool.Core;
@@ -7,25 +8,26 @@ namespace PS5AutoPayloadTool.Views;
 
 public partial class SourcesPage : UserControl
 {
+    private readonly ObservableCollection<SourceConfig> _sources = new();
+
     public SourcesPage()
     {
         InitializeComponent();
+        SourcesList.ItemsSource = _sources;
     }
 
     // Called by MainWindow when this page becomes active
-    public void Refresh()
-    {
-        PopulateList();
-    }
+    public void Refresh() => PopulateList();
 
     // ── List population ──────────────────────────────────────────────────────
 
     private void PopulateList()
     {
-        SourcesList.ItemsSource = null;
-        SourcesList.ItemsSource = MainWindow.Config.Sources;
+        _sources.Clear();
+        foreach (var s in MainWindow.Config.Sources)
+            _sources.Add(s);
 
-        EmptyState.Visibility = MainWindow.Config.Sources.Count == 0
+        EmptyState.Visibility = _sources.Count == 0
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
@@ -69,8 +71,11 @@ public partial class SourcesPage : UserControl
 
     private async void BtnScanAdd_Click(object sender, RoutedEventArgs e)
     {
-        var owner = TxtOwner.Text.Trim();
-        var repo  = TxtRepo.Text.Trim();
+        var owner  = TxtOwner.Text.Trim();
+        var repo   = TxtRepo.Text.Trim();
+        var type   = (CmbType.SelectedIndex == 1) ? "folder" : "release";
+        var filter = TxtFilter.Text.Trim();
+        var folder = TxtFolder.Text.Trim();
 
         if (string.IsNullOrEmpty(owner) || string.IsNullOrEmpty(repo))
         {
@@ -78,62 +83,70 @@ public partial class SourcesPage : UserControl
             return;
         }
 
-        var source = new PayloadSource
+        var source = new SourceConfig
         {
-            Owner      = owner,
-            Repo       = repo,
-            Type       = CmbType.SelectedIndex == 1 ? SourceType.GitHubFolder : SourceType.GitHubRelease,
-            Filter     = TxtFilter.Text.Trim(),
-            FolderPath = TxtFolder.Text.Trim()
+            Url        = $"https://github.com/{owner}/{repo}",
+            Type       = type,
+            Filter     = filter,
+            FolderPath = folder
         };
 
         TxtStatus.Text = $"Scanning {source.DisplayName}...";
+        BtnScanAdd.IsEnabled = false;
 
         var progress = new Progress<string>(msg =>
             Dispatcher.Invoke(() => TxtStatus.Text = msg));
 
-        List<PayloadItem> found;
         try
         {
-            found = await MainWindow.PayloadMgr.ScanSourceAsync(
+            var found = await MainWindow.PayloadMgr.ScanSourceAsync(
                 source, progress, CancellationToken.None);
+
+            // Add source if not already present (match by URL)
+            if (!MainWindow.Config.Sources.Any(s => s.Url == source.Url))
+                MainWindow.Config.Sources.Add(source);
+
+            // Add/update payload_meta entries
+            foreach (var (name, url, version, size) in found)
+            {
+                if (!MainWindow.Config.PayloadMeta.ContainsKey(name))
+                {
+                    MainWindow.Config.PayloadMeta[name] = new PayloadMeta
+                    {
+                        SourceUrl = source.Url,
+                        Versions  = new() { version },
+                        Version   = version,
+                        Size      = size
+                    };
+                }
+                else
+                {
+                    var meta = MainWindow.Config.PayloadMeta[name];
+                    if (!meta.Versions.Contains(version))
+                        meta.Versions.Add(version);
+                }
+            }
+
+            MainWindow.SaveConfig();
+            PopulateList();
+            AddForm.Visibility = Visibility.Collapsed;
+            TxtStatus.Text = $"Found {found.Count} payload(s). Source added.";
         }
         catch (Exception ex)
         {
             TxtStatus.Text = $"Error: {ex.Message}";
-            return;
         }
-
-        // Avoid duplicate sources (same owner/repo/type)
-        bool exists = MainWindow.Config.Sources.Any(s =>
-            s.Owner == source.Owner &&
-            s.Repo  == source.Repo  &&
-            s.Type  == source.Type);
-
-        if (!exists)
-            MainWindow.Config.Sources.Add(source);
-
-        // Merge discovered payloads (avoid duplicates by name)
-        foreach (var item in found)
+        finally
         {
-            bool dup = MainWindow.Config.Payloads.Any(p =>
-                p.Name     == item.Name &&
-                p.SourceId == item.SourceId);
-            if (!dup)
-                MainWindow.Config.Payloads.Add(item);
+            BtnScanAdd.IsEnabled = true;
         }
-
-        MainWindow.SaveConfig();
-
-        TxtStatus.Text     = $"Found {found.Count} payload(s). Source added.";
-        AddForm.Visibility = Visibility.Collapsed;
-        PopulateList();
     }
 
     // ── Rescan ───────────────────────────────────────────────────────────────
 
     private async void BtnRescan_Click(object sender, RoutedEventArgs e)
     {
+        // Tag is bound to Id which equals Url in SourceConfig
         if (sender is not Button btn || btn.Tag is not string id) return;
 
         var source = MainWindow.Config.Sources.FirstOrDefault(s => s.Id == id);
@@ -144,30 +157,38 @@ public partial class SourcesPage : UserControl
         var progress = new Progress<string>(msg =>
             Dispatcher.Invoke(() => TxtStatus.Text = msg));
 
-        List<PayloadItem> found;
         try
         {
-            found = await MainWindow.PayloadMgr.ScanSourceAsync(
+            var found = await MainWindow.PayloadMgr.ScanSourceAsync(
                 source, progress, CancellationToken.None);
+
+            foreach (var (name, url, version, size) in found)
+            {
+                if (!MainWindow.Config.PayloadMeta.ContainsKey(name))
+                {
+                    MainWindow.Config.PayloadMeta[name] = new PayloadMeta
+                    {
+                        SourceUrl = source.Url,
+                        Versions  = new() { version },
+                        Version   = version,
+                        Size      = size
+                    };
+                }
+                else
+                {
+                    var meta = MainWindow.Config.PayloadMeta[name];
+                    if (!meta.Versions.Contains(version))
+                        meta.Versions.Add(version);
+                }
+            }
+
+            MainWindow.SaveConfig();
+            TxtStatus.Text = $"Rescan complete — {found.Count} payload(s) found.";
         }
         catch (Exception ex)
         {
             TxtStatus.Text = $"Error: {ex.Message}";
-            return;
         }
-
-        // Merge new payloads
-        foreach (var item in found)
-        {
-            bool dup = MainWindow.Config.Payloads.Any(p =>
-                p.Name     == item.Name &&
-                p.SourceId == item.SourceId);
-            if (!dup)
-                MainWindow.Config.Payloads.Add(item);
-        }
-
-        MainWindow.SaveConfig();
-        TxtStatus.Text = $"Rescan complete — {found.Count} payload(s) found.";
     }
 
     // ── Remove source ────────────────────────────────────────────────────────
@@ -180,7 +201,7 @@ public partial class SourcesPage : UserControl
         if (source == null) return;
 
         var result = MessageBox.Show(
-            $"Remove source \"{source.DisplayName}\" and its payloads from the list?",
+            $"Remove source \"{source.DisplayName}\"?",
             "Confirm Remove",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
@@ -188,7 +209,6 @@ public partial class SourcesPage : UserControl
         if (result != MessageBoxResult.Yes) return;
 
         MainWindow.Config.Sources.RemoveAll(s => s.Id == id);
-        MainWindow.Config.Payloads.RemoveAll(p => p.SourceId == id);
         MainWindow.SaveConfig();
 
         TxtStatus.Text = $"Removed {source.DisplayName}.";

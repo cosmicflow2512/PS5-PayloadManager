@@ -1,36 +1,32 @@
-using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using PS5AutoPayloadTool.Models;
 
 namespace PS5AutoPayloadTool.Core;
 
 public static class ConfigManager
 {
-    private static readonly JsonSerializerOptions _writeOpts = new()
+    private static readonly JsonSerializerOptions Opts = new()
     {
-        WriteIndented = true
-    };
-
-    private static readonly JsonSerializerOptions _readOpts = new()
-    {
-        PropertyNameCaseInsensitive = true
+        WriteIndented = true,
+        PropertyNameCaseInsensitive = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
     public static AppConfig Load()
     {
         try
         {
-            if (!File.Exists(AppPaths.ConfigFile))
-                return new AppConfig();
-
+            AppPaths.EnsureDirectories();
+            if (!File.Exists(AppPaths.ConfigFile)) return new AppConfig();
             var json = File.ReadAllText(AppPaths.ConfigFile);
-            return JsonSerializer.Deserialize<AppConfig>(json, _readOpts) ?? new AppConfig();
+            var config = JsonSerializer.Deserialize<AppConfig>(json, Opts) ?? new AppConfig();
+            // Sync embedded profiles to disk
+            SyncProfilesToDisk(config);
+            return config;
         }
-        catch
-        {
-            return new AppConfig();
-        }
+        catch { return new AppConfig(); }
     }
 
     public static void Save(AppConfig config)
@@ -38,7 +34,9 @@ public static class ConfigManager
         try
         {
             AppPaths.EnsureDirectories();
-            var json = JsonSerializer.Serialize(config, _writeOpts);
+            // Before saving, embed profiles from disk into the profiles dict
+            SyncProfilesFromDisk(config);
+            var json = JsonSerializer.Serialize(config, Opts);
             File.WriteAllText(AppPaths.ConfigFile, json);
         }
         catch (Exception ex)
@@ -49,18 +47,41 @@ public static class ConfigManager
 
     public static string Export(AppConfig config)
     {
-        return JsonSerializer.Serialize(config, _writeOpts);
+        SyncProfilesFromDisk(config);
+        return JsonSerializer.Serialize(config, Opts);
     }
 
     public static AppConfig? Import(string json)
     {
         try
         {
-            return JsonSerializer.Deserialize<AppConfig>(json, _readOpts);
+            var config = JsonSerializer.Deserialize<AppConfig>(json, Opts);
+            if (config != null) SyncProfilesToDisk(config);
+            return config;
         }
-        catch
+        catch { return null; }
+    }
+
+    /// <summary>Write profiles dict entries to disk as .txt files.</summary>
+    private static void SyncProfilesToDisk(AppConfig config)
+    {
+        AppPaths.EnsureDirectories();
+        foreach (var kv in config.Profiles)
         {
-            return null;
+            var path = Path.Combine(AppPaths.ProfilesDir, kv.Key);
+            File.WriteAllText(path, kv.Value);
+        }
+    }
+
+    /// <summary>Read .txt files from profiles dir into the profiles dict.</summary>
+    private static void SyncProfilesFromDisk(AppConfig config)
+    {
+        AppPaths.EnsureDirectories();
+        if (!Directory.Exists(AppPaths.ProfilesDir)) return;
+        foreach (var file in Directory.GetFiles(AppPaths.ProfilesDir, "*.txt"))
+        {
+            var name = Path.GetFileName(file);
+            config.Profiles[name] = File.ReadAllText(file);
         }
     }
 }
