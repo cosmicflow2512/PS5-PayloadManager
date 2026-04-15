@@ -99,8 +99,10 @@ public partial class SettingsPage : UserControl
         MainWindow.Config.PS5Host      = imported.PS5Host;
         MainWindow.Config.GitHubToken  = imported.GitHubToken;
         MainWindow.Config.Sources      = imported.Sources;
-        MainWindow.Config.Payloads     = imported.Payloads;
-        MainWindow.Config.CurrentFlow  = imported.CurrentFlow;
+        MainWindow.Config.PayloadMeta  = imported.PayloadMeta;
+        MainWindow.Config.Profiles     = imported.Profiles;
+        MainWindow.Config.Devices      = imported.Devices;
+        MainWindow.Config.State.BuilderSteps = imported.State.BuilderSteps;
 
         (Window.GetWindow(this) as MainWindow)?.OnConfigChanged();
         Refresh();
@@ -114,9 +116,11 @@ public partial class SettingsPage : UserControl
             "Factory Reset", MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (result != MessageBoxResult.Yes) return;
 
-        MainWindow.Config.Sources     = new();
-        MainWindow.Config.Payloads    = new();
-        MainWindow.Config.CurrentFlow = new();
+        MainWindow.Config.Sources              = new();
+        MainWindow.Config.PayloadMeta          = new();
+        MainWindow.Config.Profiles             = new();
+        MainWindow.Config.Devices              = new();
+        MainWindow.Config.State.BuilderSteps   = new();
 
         // Clear payload files and profiles
         foreach (var f in Directory.GetFiles(AppPaths.PayloadsDir))

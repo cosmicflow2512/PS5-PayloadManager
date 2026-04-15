@@ -3,7 +3,6 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using Microsoft.Win32;
 using PS5AutoPayloadTool.Core;
 using PS5AutoPayloadTool.Models;
 
@@ -11,7 +10,7 @@ namespace PS5AutoPayloadTool.Views;
 
 public partial class FlowBuilderPage : UserControl
 {
-    private readonly ObservableCollection<FlowStepModel> _steps = new();
+    private readonly ObservableCollection<BuilderStep> _steps = new();
     private readonly ExecEngine _engine = new();
 
     private static readonly SolidColorBrush _dotOff = new(Color.FromRgb(69,  71,  90));
@@ -20,9 +19,9 @@ public partial class FlowBuilderPage : UserControl
     public FlowBuilderPage()
     {
         InitializeComponent();
-        _engine.ProgressChanged += OnEngineProgress;
         FlowStepsList.ItemsSource = _steps;
         _steps.CollectionChanged += (_, _) => UpdateEmptyHint();
+        _engine.ProgressChanged += OnEngineProgress;
     }
 
     public void Refresh()
@@ -31,11 +30,12 @@ public partial class FlowBuilderPage : UserControl
 
         // Reload steps from config
         _steps.Clear();
-        foreach (var s in MainWindow.Config.CurrentFlow)
+        foreach (var s in MainWindow.Config.State.BuilderSteps)
             _steps.Add(s);
 
-        // Populate payload combo
-        CmbPayloadStep.ItemsSource = MainWindow.Config.Payloads;
+        // Populate payload combo with payload names
+        CmbPayloadStep.ItemsSource = null;
+        CmbPayloadStep.ItemsSource = MainWindow.Config.PayloadMeta.Keys.ToList();
         if (CmbPayloadStep.Items.Count > 0)
             CmbPayloadStep.SelectedIndex = 0;
 
@@ -71,7 +71,6 @@ public partial class FlowBuilderPage : UserControl
         EllipseLua.Fill = luaOpen ? _dotOn : _dotOff;
         EllipseElf.Fill = elfOpen ? _dotOn : _dotOff;
 
-        // Update sidebar too
         if (Window.GetWindow(this) is MainWindow mw)
             mw.SetPortIndicators(luaOpen, elfOpen);
 
@@ -82,42 +81,31 @@ public partial class FlowBuilderPage : UserControl
 
     private void BtnAddPayloadStep_Click(object sender, RoutedEventArgs e)
     {
-        if (CmbPayloadStep.SelectedItem is not PayloadItem item)
+        var name = CmbPayloadStep.SelectedItem?.ToString()?.Trim() ?? "";
+        if (string.IsNullOrEmpty(name))
         {
             TxtFlowLog.Text = "Select a payload first.";
             return;
         }
 
         if (!int.TryParse(TxtPayloadPort.Text.Trim(), out int port))
-            port = 9021;
+            port = PayloadSender.GetDefaultPort(name);
+        if (port == 0) port = 9021;
 
-        var step = new FlowStepModel
-        {
-            Type        = FlowStepType.Payload,
-            PayloadName = item.Name,
-            Port        = port
-        };
-
-        _steps.Add(step);
+        _steps.Add(new BuilderStep { Type = "payload", Payload = name, Port = port });
         SyncFlowToConfig();
     }
 
     private void BtnAddWaitStep_Click(object sender, RoutedEventArgs e)
     {
         if (!int.TryParse(TxtWaitPort.Text.Trim(), out int port))
-            port = 9021;
+            port = 9026;
         if (!int.TryParse(TxtWaitTimeout.Text.Trim(), out int timeout))
             timeout = 60;
+        if (port == 0) port = 9026;
+        if (timeout == 0) timeout = 60;
 
-        var step = new FlowStepModel
-        {
-            Type           = FlowStepType.Wait,
-            Port           = port,
-            TimeoutSeconds = timeout,
-            IntervalMs     = 500
-        };
-
-        _steps.Add(step);
+        _steps.Add(new BuilderStep { Type = "wait_port", Port = port, Timeout = timeout });
         SyncFlowToConfig();
     }
 
@@ -125,14 +113,9 @@ public partial class FlowBuilderPage : UserControl
     {
         if (!int.TryParse(TxtDelayMs.Text.Trim(), out int ms))
             ms = 500;
+        if (ms == 0) ms = 500;
 
-        var step = new FlowStepModel
-        {
-            Type    = FlowStepType.Delay,
-            DelayMs = ms
-        };
-
-        _steps.Add(step);
+        _steps.Add(new BuilderStep { Type = "delay", Ms = ms });
         SyncFlowToConfig();
     }
 
@@ -140,7 +123,7 @@ public partial class FlowBuilderPage : UserControl
 
     private void BtnMoveUp_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.Tag is not FlowStepModel step) return;
+        if (sender is not Button btn || btn.Tag is not BuilderStep step) return;
         int idx = _steps.IndexOf(step);
         if (idx <= 0) return;
         _steps.Move(idx, idx - 1);
@@ -149,7 +132,7 @@ public partial class FlowBuilderPage : UserControl
 
     private void BtnMoveDown_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.Tag is not FlowStepModel step) return;
+        if (sender is not Button btn || btn.Tag is not BuilderStep step) return;
         int idx = _steps.IndexOf(step);
         if (idx < 0 || idx >= _steps.Count - 1) return;
         _steps.Move(idx, idx + 1);
@@ -158,7 +141,7 @@ public partial class FlowBuilderPage : UserControl
 
     private void BtnRemoveStep_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.Tag is not FlowStepModel step) return;
+        if (sender is not Button btn || btn.Tag is not BuilderStep step) return;
         _steps.Remove(step);
         SyncFlowToConfig();
     }
@@ -173,20 +156,14 @@ public partial class FlowBuilderPage : UserControl
             return;
         }
 
-        var dlg = new SaveFileDialog
-        {
-            Title            = "Save Flow as Profile",
-            Filter           = "Profile files (*.txt)|*.txt",
-            InitialDirectory = AppPaths.ProfilesDir,
-            FileName         = "flow_profile.txt"
-        };
-
-        if (dlg.ShowDialog() != true) return;
-
+        var name = $"flow_{DateTime.Now:yyyyMMdd_HHmm}.txt";
         var lines = _steps.Select(s => s.ToProfileLine()).Where(l => !string.IsNullOrEmpty(l));
-        File.WriteAllLines(dlg.FileName, lines);
-
-        TxtFlowLog.Text = $"Profile saved: {Path.GetFileName(dlg.FileName)}";
+        var content = string.Join("\n", lines);
+        var path = Path.Combine(AppPaths.ProfilesDir, name);
+        File.WriteAllText(path, content);
+        MainWindow.Config.Profiles[name] = content;
+        MainWindow.SaveConfig();
+        TxtFlowLog.Text = $"Saved profile: {name}";
     }
 
     // ── Run / Stop ───────────────────────────────────────────────────────────
@@ -199,14 +176,21 @@ public partial class FlowBuilderPage : UserControl
             return;
         }
 
-        var host       = TxtPS5Host.Text.Trim();
-        var directives = BuildDirectives();
+        var host = TxtPS5Host.Text.Trim();
+        MainWindow.Config.PS5Host = host;
+
+        var directives = _steps.Select(s => s.ToProfileLine())
+            .Where(l => !string.IsNullOrEmpty(l))
+            .ToList();
+
+        var content = string.Join("\n", directives);
+        var parsed  = ProfileParser.Parse(content, AppPaths.PayloadsDir);
 
         BtnRun.IsEnabled  = false;
         BtnStop.IsEnabled = true;
         PrgFlow.Value     = 0;
 
-        await _engine.RunAsync(host, directives);
+        await _engine.RunAsync(host, parsed);
 
         BtnRun.IsEnabled  = true;
         BtnStop.IsEnabled = false;
@@ -245,34 +229,7 @@ public partial class FlowBuilderPage : UserControl
 
     private void SyncFlowToConfig()
     {
-        MainWindow.Config.CurrentFlow = _steps.ToList();
+        MainWindow.Config.State.BuilderSteps = _steps.ToList();
         MainWindow.SaveConfig();
-    }
-
-    private List<IDirective> BuildDirectives()
-    {
-        var list = new List<IDirective>();
-        foreach (var step in _steps)
-        {
-            switch (step.Type)
-            {
-                case FlowStepType.Payload:
-                    var localPath = Path.Combine(AppPaths.PayloadsDir, step.PayloadName);
-                    list.Add(new SendDirective { FilePath = localPath, Port = step.Port });
-                    break;
-                case FlowStepType.Wait:
-                    list.Add(new WaitPortDirective
-                    {
-                        Port           = step.Port,
-                        TimeoutSeconds = step.TimeoutSeconds,
-                        IntervalMs     = step.IntervalMs
-                    });
-                    break;
-                case FlowStepType.Delay:
-                    list.Add(new DelayDirective { DelayMs = step.DelayMs });
-                    break;
-            }
-        }
-        return list;
     }
 }
