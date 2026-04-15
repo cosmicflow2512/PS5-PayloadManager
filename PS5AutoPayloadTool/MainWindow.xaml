@@ -8,6 +8,40 @@
         Foreground="{StaticResource FgMain}"
         WindowStartupLocation="CenterScreen">
 
+    <!-- Resources MUST appear before any content that references them -->
+    <Window.Resources>
+        <Style x:Key="NavBtn" TargetType="RadioButton">
+            <Setter Property="Foreground"                 Value="{StaticResource FgSubtle}"/>
+            <Setter Property="Background"                 Value="Transparent"/>
+            <Setter Property="FontSize"                   Value="13"/>
+            <Setter Property="Padding"                    Value="16,11"/>
+            <Setter Property="Cursor"                     Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1E3A5F"/>
+                                <Setter Property="Foreground"                 Value="{StaticResource Accent}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgSurface}"/>
+                                <Setter Property="Foreground"                 Value="{StaticResource FgMain}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="200"/>
@@ -15,8 +49,7 @@
         </Grid.ColumnDefinitions>
 
         <!-- ═════════════════════════ SIDEBAR ════════════════════════════ -->
-        <Grid Grid.Column="0"
-              Background="{StaticResource BgMantle}">
+        <Grid Grid.Column="0" Background="{StaticResource BgMantle}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -35,51 +68,39 @@
                            Margin="0,2,0,0"/>
             </StackPanel>
 
-            <Separator Grid.Row="1"
-                       Background="{StaticResource BgSurface}"
-                       Margin="0"/>
+            <Separator Grid.Row="1" Background="{StaticResource BgSurface}" Margin="0"/>
 
             <!-- Nav Items -->
             <StackPanel Grid.Row="2" Margin="0,8,0,0">
-
                 <RadioButton x:Name="NavSources"
                              Content="&#x2295;  Sources"
-                             GroupName="Nav"
-                             IsChecked="True"
+                             GroupName="Nav" IsChecked="True"
                              Checked="NavSources_Checked"
                              Style="{StaticResource NavBtn}"/>
-
                 <RadioButton x:Name="NavPayloads"
                              Content="&#x229E;  Payloads"
                              GroupName="Nav"
                              Checked="NavPayloads_Checked"
                              Style="{StaticResource NavBtn}"/>
-
                 <RadioButton x:Name="NavFlow"
                              Content="&#x25B6;  Flow Builder"
                              GroupName="Nav"
                              Checked="NavFlow_Checked"
                              Style="{StaticResource NavBtn}"/>
-
                 <RadioButton x:Name="NavProfiles"
                              Content="&#x2261;  Profiles"
                              GroupName="Nav"
                              Checked="NavProfiles_Checked"
                              Style="{StaticResource NavBtn}"/>
-
                 <RadioButton x:Name="NavSettings"
                              Content="&#x2699;  Settings"
                              GroupName="Nav"
                              Checked="NavSettings_Checked"
                              Style="{StaticResource NavBtn}"/>
-
             </StackPanel>
 
             <!-- Sidebar Footer: PS5 IP + port dots -->
-            <Border Grid.Row="3"
-                    Background="{StaticResource BgBase}"
-                    Padding="12,10"
-                    Margin="0">
+            <Border Grid.Row="3" Background="{StaticResource BgBase}" Padding="12,10">
                 <StackPanel>
                     <TextBlock Text="PS5 Console"
                                FontSize="10"
@@ -115,41 +136,6 @@
         <ContentControl Grid.Column="1"
                         x:Name="ContentArea"
                         Background="{StaticResource BgBase}"/>
-
     </Grid>
-
-    <Window.Resources>
-        <!-- Sidebar RadioButton nav item style -->
-        <Style x:Key="NavBtn" TargetType="RadioButton">
-            <Setter Property="Foreground"         Value="{StaticResource FgSubtle}"/>
-            <Setter Property="Background"         Value="Transparent"/>
-            <Setter Property="FontSize"           Value="13"/>
-            <Setter Property="Padding"            Value="16,11"/>
-            <Setter Property="Cursor"             Value="Hand"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#1E3A5F"/>
-                                <Setter Property="Foreground"                 Value="{StaticResource Accent}"/>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgSurface}"/>
-                                <Setter Property="Foreground"                 Value="{StaticResource FgMain}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Window.Resources>
 
 </Window>
