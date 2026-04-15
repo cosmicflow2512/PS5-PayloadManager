@@ -79,9 +79,10 @@
                                                        FontSize="13"
                                                        VerticalAlignment="Center"/>
                                         </StackPanel>
-                                        <TextBlock x:Name="SourceLabel"
+                                        <TextBlock Text="{Binding Meta.SourceUrl}"
                                                    Foreground="{StaticResource FgSubtle}"
-                                                   FontSize="11" Margin="16,2,0,0"/>
+                                                   FontSize="11" Margin="16,2,0,0"
+                                                   TextTrimming="CharacterEllipsis"/>
 
                                         <StackPanel Orientation="Horizontal" Margin="16,6,0,0">
                                             <TextBlock Text="Version:"
@@ -89,9 +90,8 @@
                                                        FontSize="11"
                                                        VerticalAlignment="Center"
                                                        Margin="0,0,6,0"/>
-                                            <ComboBox x:Name="CmbVersion"
-                                                      ItemsSource="{Binding AvailableVersions}"
-                                                      SelectedItem="{Binding CurrentVersion}"
+                                            <ComboBox ItemsSource="{Binding AvailableVersions}"
+                                                      SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
                                                       Width="130"
                                                       FontSize="11"/>
                                         </StackPanel>

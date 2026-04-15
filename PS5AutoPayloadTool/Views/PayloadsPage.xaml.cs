@@ -18,8 +18,13 @@ public partial class PayloadsPage : UserControl
     private void PopulateList()
     {
         _items.Clear();
-        foreach (var kv in MainWindow.Config.PayloadMeta)
-            _items.Add(new PayloadEntry(kv.Key, kv.Value));
+        var meta = MainWindow.Config.PayloadMeta;
+        if (meta != null)
+        {
+            foreach (var kv in meta)
+                if (kv.Value != null)
+                    _items.Add(new PayloadEntry(kv.Key, kv.Value));
+        }
 
         EmptyState.Visibility = _items.Count == 0
             ? Visibility.Visible

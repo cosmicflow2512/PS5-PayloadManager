@@ -30,6 +30,12 @@ public static class ConfigManager
             if (!File.Exists(AppPaths.ConfigFile)) return new AppConfig();
             var json = File.ReadAllText(AppPaths.ConfigFile);
             var config = JsonSerializer.Deserialize<AppConfig>(json, ReadOpts) ?? new AppConfig();
+            // JSON null can override C# field initializers — guard every collection
+            config.Sources      ??= new();
+            config.PayloadMeta  ??= new();
+            config.Profiles     ??= new();
+            config.Devices      ??= new();
+            config.State        ??= new();
             SyncProfilesToDisk(config);
             return config;
         }
