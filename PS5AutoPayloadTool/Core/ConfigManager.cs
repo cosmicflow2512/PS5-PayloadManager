@@ -7,18 +7,18 @@ namespace PS5AutoPayloadTool.Core;
 
 public static class ConfigManager
 {
-    // Write options: compact, null fields omitted
+    // Write options: pretty, null fields omitted
     private static readonly JsonSerializerOptions WriteOpts = new()
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    // Read options: lenient — case-insensitive, numbers from strings
+    // Read options for our own format: case-insensitive, numbers from strings
     private static readonly JsonSerializerOptions ReadOpts = new()
     {
         PropertyNameCaseInsensitive = true,
-        NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString,
+        NumberHandling = JsonNumberHandling.AllowReadingFromString,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
@@ -29,7 +29,7 @@ public static class ConfigManager
             AppPaths.EnsureDirectories();
             if (!File.Exists(AppPaths.ConfigFile)) return new AppConfig();
             var json = File.ReadAllText(AppPaths.ConfigFile);
-            var config = ParseConfig(json) ?? new AppConfig();
+            var config = JsonSerializer.Deserialize<AppConfig>(json, ReadOpts) ?? new AppConfig();
             SyncProfilesToDisk(config);
             return config;
         }
@@ -42,8 +42,7 @@ public static class ConfigManager
         {
             AppPaths.EnsureDirectories();
             SyncProfilesFromDisk(config);
-            var json = JsonSerializer.Serialize(config, WriteOpts);
-            File.WriteAllText(AppPaths.ConfigFile, json);
+            File.WriteAllText(AppPaths.ConfigFile, JsonSerializer.Serialize(config, WriteOpts));
         }
         catch (Exception ex)
         {
@@ -58,14 +57,14 @@ public static class ConfigManager
     }
 
     /// <summary>
-    /// Import a config JSON string. Returns (config, null) on success or
-    /// (null, errorMessage) on failure so callers can show a meaningful message.
+    /// Import a config JSON (our native format OR PS5AutopayloadHA backup).
+    /// Returns (config, null) on success or (null, errorMessage) on failure.
     /// </summary>
     public static (AppConfig? Config, string? Error) Import(string json)
     {
         try
         {
-            var config = ParseConfig(json);
+            var config = ParseAnyFormat(json);
             if (config == null) return (null, "JSON parsed to null — file may be empty.");
             SyncProfilesToDisk(config);
             return (config, null);
@@ -80,67 +79,170 @@ public static class ConfigManager
         }
     }
 
-    // ── Parsing ──────────────────────────────────────────────────────────────
+    // ── Format-agnostic parser ────────────────────────────────────────────────
 
     /// <summary>
-    /// Parses JSON into AppConfig. Handles two layouts:
-    ///   • Nested:  { "state": { "ps5_ip": "...", ... }, "sources": [...], ... }
-    ///   • Flat HA: { "ps5_ip": "...", "builder_steps": [...], "sources": [...], ... }
+    /// Parses both our native format and PS5AutopayloadHA backup format.
+    ///
+    /// Differences handled:
+    ///   sources[].repo        "owner/repo"     → url  "https://github.com/owner/repo"
+    ///   sources[].source_type "releases"/"folder" → type "release"/"folder"
+    ///   sources[].folder      "path"           → folder_path "path"
+    ///   payload_meta[].versions [{tag:"v1"}]   → ["v1"]  (HA uses tag objects)
     /// </summary>
-    private static AppConfig? ParseConfig(string json)
+    private static AppConfig? ParseAnyFormat(string json)
     {
-        // First attempt: strict nested format (our native format)
-        var config = JsonSerializer.Deserialize<AppConfig>(json, ReadOpts);
-        if (config == null) return null;
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
 
-        // If state is empty but we can find flat-level fields, migrate them.
-        // This handles HA backups that don't use the "state" wrapper.
-        if (string.IsNullOrEmpty(config.State.PS5Ip) || config.State.PS5Ip == "192.168.1.100")
+        var config = new AppConfig();
+
+        // ── version ──────────────────────────────────────────────────────────
+        if (root.TryGetProperty("version", out var vEl))
+            config.Version = vEl.ValueKind == JsonValueKind.String
+                ? (int.TryParse(vEl.GetString(), out var vi) ? vi : 1)
+                : vEl.GetInt32();
+
+        // ── state ────────────────────────────────────────────────────────────
+        if (root.TryGetProperty("state", out var stateEl) && stateEl.ValueKind == JsonValueKind.Object)
         {
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
+            if (stateEl.TryGetProperty("ps5_ip", out var ip))         config.State.PS5Ip             = ip.GetString()  ?? "";
+            if (stateEl.TryGetProperty("github_token", out var tok))  config.State.GitHubToken       = tok.GetString() ?? "";
+            if (stateEl.TryGetProperty("builder_profile_name", out var bpn)) config.State.BuilderProfileName = bpn.GetString() ?? "";
+            if (stateEl.TryGetProperty("payload_filter", out var pf)) config.State.PayloadFilter     = pf.GetString()  ?? "";
+            if (stateEl.TryGetProperty("advanced_mode", out var am) && am.ValueKind == JsonValueKind.True)
+                config.State.AdvancedMode = true;
+            if (stateEl.TryGetProperty("favorites", out var fav))
+                config.State.Favorites = ParseStringList(fav);
+            if (stateEl.TryGetProperty("builder_steps", out var bsEl))
+                config.State.BuilderSteps = ParseBuilderSteps(bsEl);
+        }
+        else
+        {
+            // flat HA format: ps5_ip / github_token / builder_steps at root
+            if (root.TryGetProperty("ps5_ip", out var ip))           config.State.PS5Ip       = ip.GetString()  ?? "";
+            if (root.TryGetProperty("github_token", out var tok))    config.State.GitHubToken = tok.GetString() ?? "";
+            if (root.TryGetProperty("builder_steps", out var bsEl))  config.State.BuilderSteps = ParseBuilderSteps(bsEl);
+        }
 
-            if (root.TryGetProperty("ps5_ip", out var ip) && ip.ValueKind == JsonValueKind.String)
-                config.State.PS5Ip = ip.GetString()!;
-
-            if (root.TryGetProperty("github_token", out var tok) && tok.ValueKind == JsonValueKind.String)
-                config.State.GitHubToken = tok.GetString()!;
-
-            if (root.TryGetProperty("builder_steps", out var steps) && steps.ValueKind == JsonValueKind.Array)
+        // ── devices ──────────────────────────────────────────────────────────
+        if (root.TryGetProperty("devices", out var devicesEl) && devicesEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var d in devicesEl.EnumerateArray())
             {
-                var stepsJson = steps.GetRawText();
-                var parsed = JsonSerializer.Deserialize<List<PS5AutoPayloadTool.Models.BuilderStep>>(stepsJson, ReadOpts);
-                if (parsed != null) config.State.BuilderSteps = parsed;
+                var dev = new DeviceConfig();
+                if (d.TryGetProperty("ip", out var dip)) dev.Ip = dip.GetString() ?? "";
+                config.Devices.Add(dev);
             }
         }
 
         // Keep devices[0] in sync with state.PS5Ip
-        if (config.Devices.Count == 0 && !string.IsNullOrEmpty(config.State.PS5Ip))
+        if (config.Devices.Count == 0 && !string.IsNullOrWhiteSpace(config.State.PS5Ip))
             config.Devices.Add(new DeviceConfig { Ip = config.State.PS5Ip });
+
+        // ── sources ──────────────────────────────────────────────────────────
+        if (root.TryGetProperty("sources", out var srcEl) && srcEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var s in srcEl.EnumerateArray())
+            {
+                var src = new SourceConfig();
+
+                // url (native) or repo (HA: "owner/repo")
+                if (s.TryGetProperty("url", out var url))
+                    src.Url = url.GetString() ?? "";
+                else if (s.TryGetProperty("repo", out var repo))
+                    src.Url = $"https://github.com/{repo.GetString()}";
+
+                // type (native: "release"/"folder") or source_type (HA: "releases"/"folder"/"auto")
+                if (s.TryGetProperty("type", out var typ))
+                    src.Type = typ.GetString() ?? "release";
+                else if (s.TryGetProperty("source_type", out var st))
+                    src.Type = (st.GetString() ?? "releases") == "releases" ? "release" : "folder";
+
+                if (s.TryGetProperty("filter", out var flt))     src.Filter     = flt.GetString() ?? "";
+                if (s.TryGetProperty("folder_path", out var fp)) src.FolderPath = fp.GetString()  ?? "";
+                else if (s.TryGetProperty("folder", out var fo)) src.FolderPath = fo.GetString()  ?? "";
+
+                if (!string.IsNullOrEmpty(src.Url))
+                    config.Sources.Add(src);
+            }
+        }
+
+        // ── payload_meta ─────────────────────────────────────────────────────
+        if (root.TryGetProperty("payload_meta", out var metaEl) && metaEl.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var entry in metaEl.EnumerateObject())
+            {
+                var pm = new PayloadMeta();
+
+                if (entry.Value.TryGetProperty("version", out var v))    pm.Version   = v.GetString() ?? "";
+                if (entry.Value.TryGetProperty("source_url", out var su)) pm.SourceUrl = su.GetString() ?? "";
+                if (entry.Value.TryGetProperty("local_path", out var lp)) pm.LocalPath = lp.GetString() ?? "";
+                if (entry.Value.TryGetProperty("size", out var sz) && sz.ValueKind == JsonValueKind.Number)
+                    pm.Size = sz.GetInt64();
+
+                if (entry.Value.TryGetProperty("versions", out var vers) && vers.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var ver in vers.EnumerateArray())
+                    {
+                        // Native format: "v2.4.0"
+                        // HA format:     {"tag": "v2.4.0"}
+                        if (ver.ValueKind == JsonValueKind.String)
+                            pm.Versions.Add(ver.GetString()!);
+                        else if (ver.ValueKind == JsonValueKind.Object &&
+                                 ver.TryGetProperty("tag", out var tag))
+                            pm.Versions.Add(tag.GetString()!);
+                    }
+                }
+
+                config.PayloadMeta[entry.Name] = pm;
+            }
+        }
+
+        // ── profiles ─────────────────────────────────────────────────────────
+        if (root.TryGetProperty("profiles", out var profEl) && profEl.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var p in profEl.EnumerateObject())
+                if (p.Value.ValueKind == JsonValueKind.String)
+                    config.Profiles[p.Name] = p.Value.GetString() ?? "";
+        }
 
         return config;
     }
 
-    /// <summary>Write profiles dict entries to disk as .txt files.</summary>
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private static List<string> ParseStringList(JsonElement el)
+    {
+        var list = new List<string>();
+        if (el.ValueKind != JsonValueKind.Array) return list;
+        foreach (var item in el.EnumerateArray())
+            if (item.ValueKind == JsonValueKind.String)
+                list.Add(item.GetString()!);
+        return list;
+    }
+
+    private static List<BuilderStep> ParseBuilderSteps(JsonElement el)
+    {
+        if (el.ValueKind != JsonValueKind.Array) return new();
+        try { return JsonSerializer.Deserialize<List<BuilderStep>>(el.GetRawText(), ReadOpts) ?? new(); }
+        catch { return new(); }
+    }
+
+    // ── Profile sync ─────────────────────────────────────────────────────────
+
     private static void SyncProfilesToDisk(AppConfig config)
     {
         AppPaths.EnsureDirectories();
         foreach (var kv in config.Profiles)
-        {
-            var path = Path.Combine(AppPaths.ProfilesDir, kv.Key);
-            File.WriteAllText(path, kv.Value);
-        }
+            File.WriteAllText(Path.Combine(AppPaths.ProfilesDir, kv.Key), kv.Value);
     }
 
-    /// <summary>Read .txt files from profiles dir into the profiles dict.</summary>
     private static void SyncProfilesFromDisk(AppConfig config)
     {
         AppPaths.EnsureDirectories();
         if (!Directory.Exists(AppPaths.ProfilesDir)) return;
         foreach (var file in Directory.GetFiles(AppPaths.ProfilesDir, "*.txt"))
-        {
-            var name = Path.GetFileName(file);
-            config.Profiles[name] = File.ReadAllText(file);
-        }
+            config.Profiles[Path.GetFileName(file)] = File.ReadAllText(file);
     }
 }
