@@ -162,17 +162,19 @@ public partial class PayloadsPage : UserControl
 }
 
 /// <summary>View-model wrapper for a PayloadMeta entry.</summary>
-public class PayloadEntry(string name, PayloadMeta meta) : System.ComponentModel.INotifyPropertyChanged
+public class PayloadEntry : System.ComponentModel.INotifyPropertyChanged
 {
-    public string Name { get; } = name;
-    public PayloadMeta Meta { get; } = meta;
-    public List<string> AvailableVersions => meta.Versions;
-    public string? CurrentVersion => meta.Version;
-    public string SelectedVersion { get; set; } = meta.Version;
-    public bool IsDownloaded => meta.IsDownloaded;
+    public PayloadEntry(string name, PayloadMeta meta) { Name = name; Meta = meta; SelectedVersion = meta.Version; }
+
+    public string Name { get; }
+    public PayloadMeta Meta { get; }
+    public List<string> AvailableVersions => Meta.Versions;
+    public string? CurrentVersion => Meta.Version;
+    public string SelectedVersion { get; set; }
+    public bool IsDownloaded => Meta.IsDownloaded;
 
     // Expose Id so XAML Tag="{Binding Id}" still binds (Id = Name)
-    public string Id => name;
+    public string Id => Name;
 
     private string _statusText = "";
     public string StatusText
