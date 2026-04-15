@@ -1,0 +1,110 @@
+<UserControl x:Class="PS5AutoPayloadTool.Views.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BgBase}">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24">
+
+            <!-- Page title -->
+            <TextBlock Text="Settings" Style="{StaticResource PageTitle}"/>
+
+            <!-- ── General ──────────────────────────────────────────── -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="GENERAL" Style="{StaticResource SectionTitle}"/>
+
+                    <TextBlock Text="PS5 IP Address"
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="12" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtHost" Margin="0,0,0,12"
+                             TextChanged="TxtHost_TextChanged"/>
+
+                    <TextBlock Text="GitHub Token (optional — increases API rate limit)"
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="12" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtToken" Margin="0,0,0,12"
+                             TextChanged="TxtToken_TextChanged"/>
+
+                    <TextBlock Text="Leave GitHub Token empty if you don't have one."
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="11" FontStyle="Italic"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ── Data Folder ──────────────────────────────────────── -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="DATA" Style="{StaticResource SectionTitle}"/>
+
+                    <TextBlock Text="Storage location:"
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="12" Margin="0,0,0,4"/>
+                    <TextBlock x:Name="TxtDataPath"
+                               Foreground="{StaticResource Accent}"
+                               FontFamily="Consolas" FontSize="12"
+                               TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="TxtStats"
+                                   Foreground="{StaticResource FgSubtle}"
+                                   FontSize="12" VerticalAlignment="Center"
+                                   Margin="0,0,12,0"/>
+                        <Button Content="Open Folder"
+                                Style="{StaticResource Btn}"
+                                Click="BtnOpenFolder_Click"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ── Backup & Restore ──────────────────────────────────── -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="BACKUP &amp; RESTORE" Style="{StaticResource SectionTitle}"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button Content="Export Config"
+                                Style="{StaticResource BtnAccent}"
+                                Click="BtnExport_Click" Margin="0,0,8,0"/>
+                        <Button Content="Import Config"
+                                Style="{StaticResource Btn}"
+                                Click="BtnImport_Click"/>
+                    </StackPanel>
+
+                    <Separator Background="{StaticResource BgSurface}" Margin="0,8"/>
+
+                    <TextBlock Text="Factory Reset removes all sources, payloads and profiles."
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="12" Margin="0,0,0,8"/>
+                    <Button Content="Factory Reset"
+                            Style="{StaticResource BtnDanger}"
+                            HorizontalAlignment="Left"
+                            Click="BtnReset_Click"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ── About ─────────────────────────────────────────────── -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="ABOUT" Style="{StaticResource SectionTitle}"/>
+                    <TextBlock Text="PS5 AutoPayload Tool  v1.0"
+                               Foreground="{StaticResource FgMain}"
+                               FontSize="13" Margin="0,0,0,4"/>
+                    <TextBlock Text="Windows companion app for PS5AutopayloadHA"
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="12" Margin="0,0,0,4"/>
+                    <TextBlock Text="github.com/cosmicflow2512/PS5AutoPayloadTool"
+                               Foreground="{StaticResource Accent}"
+                               FontSize="12" Cursor="Hand"
+                               MouseLeftButtonUp="LnkGitHub_Click"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Status -->
+            <TextBlock x:Name="TxtStatus"
+                       Foreground="{StaticResource Green}"
+                       FontSize="12" Margin="0,4,0,0"/>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
