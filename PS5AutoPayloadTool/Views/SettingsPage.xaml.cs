@@ -86,23 +86,23 @@ public partial class SettingsPage : UserControl
         };
         if (dlg.ShowDialog() != true) return;
 
-        var json      = File.ReadAllText(dlg.FileName);
-        var imported  = ConfigManager.Import(json);
+        var json = File.ReadAllText(dlg.FileName);
+        var (imported, importError) = ConfigManager.Import(json);
         if (imported == null)
         {
-            MessageBox.Show("Could not parse the config file.", "Import Error",
+            MessageBox.Show($"Could not parse the config file.\n\n{importError}", "Import Error",
                 MessageBoxButton.OK, MessageBoxImage.Error);
             return;
         }
 
         // Overwrite current config
-        MainWindow.Config.PS5Host      = imported.PS5Host;
-        MainWindow.Config.GitHubToken  = imported.GitHubToken;
-        MainWindow.Config.Sources      = imported.Sources;
-        MainWindow.Config.PayloadMeta  = imported.PayloadMeta;
-        MainWindow.Config.Profiles     = imported.Profiles;
-        MainWindow.Config.Devices      = imported.Devices;
-        MainWindow.Config.State.BuilderSteps = imported.State.BuilderSteps;
+        MainWindow.Config.PS5Host                = imported.PS5Host;
+        MainWindow.Config.GitHubToken            = imported.GitHubToken;
+        MainWindow.Config.Sources                = imported.Sources;
+        MainWindow.Config.PayloadMeta            = imported.PayloadMeta;
+        MainWindow.Config.Profiles               = imported.Profiles;
+        MainWindow.Config.Devices                = imported.Devices;
+        MainWindow.Config.State.BuilderSteps     = imported.State.BuilderSteps;
 
         (Window.GetWindow(this) as MainWindow)?.OnConfigChanged();
         Refresh();
