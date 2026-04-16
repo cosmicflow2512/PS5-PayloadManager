@@ -245,6 +245,18 @@ public class BuilderStep : System.ComponentModel.INotifyPropertyChanged
     };
 
     /// <summary>
+    /// Version badge shown next to the payload ComboBox in the Autoload Builder.
+    /// Set externally by FlowBuilderPage.UpdateVersionLabels().
+    /// </summary>
+    private string _versionLabel = "";
+    [JsonIgnore]
+    public string VersionLabel
+    {
+        get => _versionLabel;
+        set { _versionLabel = value; Notify(nameof(VersionLabel)); }
+    }
+
+    /// <summary>
     /// Serialises this step to a profile-text line.
     /// "payload"   → "filename.elf port"
     /// "delay"     → "!ms"

@@ -43,6 +43,7 @@ public partial class FlowBuilderPage : UserControl
             TxtSaveName.Text = profileName;
         UpdateEmptyHint();
         _loading = false;
+        UpdateVersionLabels();
         SyncFlowToConfig();
     }
 
@@ -67,6 +68,7 @@ public partial class FlowBuilderPage : UserControl
 
         UpdateEmptyHint();
         _loading = false;
+        UpdateVersionLabels();
     }
 
     private void UpdateEmptyHint() =>
@@ -140,6 +142,7 @@ public partial class FlowBuilderPage : UserControl
         if (cb.DataContext is BuilderStep step && cb.SelectedItem is string name)
         {
             step.Port = PayloadSender.GetDefaultPort(name);
+            UpdateVersionLabels();
             SyncFlowToConfig();
         }
     }
@@ -342,6 +345,35 @@ public partial class FlowBuilderPage : UserControl
         TxtFlowLog.Text = string.IsNullOrEmpty(TxtFlowLog.Text)
             ? msg : TxtFlowLog.Text + "\n" + msg;
         LogScroll.ScrollToBottom();
+    }
+
+    /// <summary>
+    /// Refreshes the VersionLabel on every payload step so the badge next to
+    /// the ComboBox stays current (e.g. "(Latest)" or "(v1.03)").
+    /// </summary>
+    private void UpdateVersionLabels()
+    {
+        foreach (var step in _steps)
+        {
+            if (step.Type != "payload" || string.IsNullOrEmpty(step.Payload))
+            {
+                step.VersionLabel = "";
+                continue;
+            }
+
+            if (MainWindow.Config.PayloadMeta.TryGetValue(step.Payload, out var meta)
+                && !string.IsNullOrEmpty(meta.Version))
+            {
+                // The first entry in Versions is the newest (releases are fetched
+                // newest-first and the initial scan inserts it first).
+                var isLatest = meta.Versions.Count > 0 && meta.Versions[0] == meta.Version;
+                step.VersionLabel = isLatest ? "(Latest)" : $"({meta.Version})";
+            }
+            else
+            {
+                step.VersionLabel = "";
+            }
+        }
     }
 
     private void SyncFlowToConfig()

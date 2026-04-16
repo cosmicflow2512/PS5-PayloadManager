@@ -1,13 +1,24 @@
 using System.IO;
+using System.IO.Compression;
 using PS5AutoPayloadTool.Models;
 
 namespace PS5AutoPayloadTool.Core;
 
 public class PayloadManager(GitHubClient github)
 {
+    // ZIP-sourced payloads use this URL convention:
+    //   zip:{zipBrowserDownloadUrl}|{entryFullName}
+    // so DownloadAsync knows to download the archive and extract the specific entry.
+    private const string ZipUrlPrefix    = "zip:";
+    private const char   ZipUrlSeparator = '|';
+
+    // ── Scan ─────────────────────────────────────────────────────────────────
+
     /// <summary>
     /// Scans a source and returns (name, downloadUrl, version, size) tuples
-    /// for all payload files found.
+    /// for all payload files found.  ZIP release assets are transparently
+    /// unpacked: every .elf / .bin / .lua inside the archive is returned as
+    /// a separate entry with a <c>zip:</c>-prefixed download URL.
     /// </summary>
     public async Task<List<(string Name, string DownloadUrl, string Version, long Size)>> ScanSourceAsync(
         SourceConfig source,
@@ -24,10 +35,36 @@ public class PayloadManager(GitHubClient github)
                 ct.ThrowIfCancellationRequested();
                 foreach (var asset in release.Assets)
                 {
-                    if (!GitHubClient.IsPayloadFile(asset.Name)) continue;
-                    if (!string.IsNullOrEmpty(source.Filter) &&
-                        !MatchFilter(asset.Name, source.Filter)) continue;
-                    results.Add((asset.Name, asset.BrowserDownloadUrl, release.TagName, asset.Size));
+                    if (GitHubClient.IsPayloadFile(asset.Name))
+                    {
+                        if (!string.IsNullOrEmpty(source.Filter) &&
+                            !MatchFilter(asset.Name, source.Filter)) continue;
+                        results.Add((asset.Name, asset.BrowserDownloadUrl, release.TagName, asset.Size));
+                    }
+                    else if (GitHubClient.IsZipFile(asset.Name))
+                    {
+                        progress?.Report($"Scanning archive {asset.Name}…");
+                        try
+                        {
+                            var entries = await PeekZipAsync(asset.BrowserDownloadUrl, ct);
+                            bool anyPayload = false;
+                            foreach (var (entryName, entryPath, entrySize) in entries)
+                            {
+                                if (!GitHubClient.IsPayloadFile(entryName)) continue;
+                                if (!string.IsNullOrEmpty(source.Filter) &&
+                                    !MatchFilter(entryName, source.Filter)) continue;
+                                var zipUrl = $"{ZipUrlPrefix}{asset.BrowserDownloadUrl}{ZipUrlSeparator}{entryPath}";
+                                results.Add((entryName, zipUrl, release.TagName, entrySize));
+                                anyPayload = true;
+                            }
+                            if (!anyPayload)
+                                progress?.Report($"No valid payloads found in {asset.Name}");
+                        }
+                        catch (Exception ex)
+                        {
+                            progress?.Report($"Warning: could not scan {asset.Name}: {ex.Message}");
+                        }
+                    }
                 }
             }
         }
@@ -50,8 +87,13 @@ public class PayloadManager(GitHubClient github)
         return results;
     }
 
+    // ── Download ─────────────────────────────────────────────────────────────
+
     /// <summary>
-    /// Downloads a payload to cache and updates payload_meta in config.
+    /// Downloads a payload to cache and copies it to the active payloads directory.
+    /// Handles both direct URLs and <c>zip:</c>-prefixed URLs for archive assets.
+    /// When extracting from a ZIP, all payload files in the archive are cached at
+    /// once so sibling payloads don't require a second ZIP download.
     /// </summary>
     public async Task DownloadAsync(
         AppConfig config,
@@ -62,15 +104,27 @@ public class PayloadManager(GitHubClient github)
         IProgress<(long, long)>? progress = null,
         CancellationToken ct = default)
     {
-        // Cache path: CacheDir/name/version/name
         var versionDir = Path.Combine(AppPaths.CacheDir, name, version);
         Directory.CreateDirectory(versionDir);
         var cachePath = Path.Combine(versionDir, name);
 
         if (!File.Exists(cachePath))
-            await github.DownloadFileAsync(downloadUrl, cachePath, progress, ct);
+        {
+            if (downloadUrl.StartsWith(ZipUrlPrefix))
+            {
+                await DownloadFromZipAsync(downloadUrl, version, cachePath, progress, ct);
+            }
+            else
+            {
+                await github.DownloadFileAsync(downloadUrl, cachePath, progress, ct);
+            }
+        }
 
-        // Copy to active payloads dir
+        // Verify the file was extracted/downloaded successfully
+        if (!File.Exists(cachePath))
+            throw new InvalidOperationException($"Could not obtain '{name}' (cache path missing after download).");
+
+        // Copy to active payloads directory
         Directory.CreateDirectory(AppPaths.PayloadsDir);
         var activePath = Path.Combine(AppPaths.PayloadsDir, name);
         File.Copy(cachePath, activePath, overwrite: true);
@@ -118,11 +172,90 @@ public class PayloadManager(GitHubClient github)
         await DownloadAsync(config, name, match.DownloadUrl, version, sourceUrl, progress, ct);
     }
 
+    // ── ZIP helpers ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Downloads a ZIP to a temp file, lists every entry (name, fullPath, size),
+    /// then deletes the temp file.  Used by ScanSourceAsync to enumerate payloads
+    /// inside release archives without permanently storing the archive.
+    /// </summary>
+    private async Task<List<(string Name, string FullPath, long Size)>> PeekZipAsync(
+        string zipUrl, CancellationToken ct)
+    {
+        var tempPath = Path.Combine(Path.GetTempPath(), $"ps5apt_{Guid.NewGuid():N}.zip");
+        try
+        {
+            await github.DownloadFileAsync(zipUrl, tempPath, null, ct);
+            using var zip = ZipFile.OpenRead(tempPath);
+            return zip.Entries
+                .Where(e => e.Length > 0)          // exclude directory entries
+                .Select(e => (e.Name, e.FullName, e.Length))
+                .ToList();
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+                try { File.Delete(tempPath); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Downloads a ZIP archive and extracts ALL payload files it contains into
+    /// their respective cache slots (CacheDir/{name}/{version}/{name}).  This
+    /// means that when a ZIP holds several payloads, downloading any one of them
+    /// caches the others for free — avoiding repeated ZIP downloads.
+    /// </summary>
+    private async Task DownloadFromZipAsync(
+        string zipDownloadUrl,
+        string version,
+        string requiredCachePath,
+        IProgress<(long, long)>? progress,
+        CancellationToken ct)
+    {
+        // Parse "zip:{zipUrl}|{entryFullName}"
+        var inner  = zipDownloadUrl[ZipUrlPrefix.Length..];
+        var sepIdx = inner.IndexOf(ZipUrlSeparator);
+        if (sepIdx < 0)
+            throw new InvalidOperationException("Malformed ZIP download URL (missing separator).");
+        var zipUrl = inner[..sepIdx];
+
+        var tempZip = Path.Combine(Path.GetTempPath(), $"ps5apt_{Guid.NewGuid():N}.zip");
+        try
+        {
+            await github.DownloadFileAsync(zipUrl, tempZip, progress, ct);
+            using var zip = ZipFile.OpenRead(tempZip);
+
+            // Extract every payload in the archive so sibling payloads are cached too
+            foreach (var entry in zip.Entries)
+            {
+                if (entry.Length == 0) continue;                        // directory entry
+                if (!GitHubClient.IsPayloadFile(entry.Name)) continue;  // not a payload
+
+                var entryVersionDir = Path.Combine(AppPaths.CacheDir, entry.Name, version);
+                Directory.CreateDirectory(entryVersionDir);
+                var entryCachePath = Path.Combine(entryVersionDir, entry.Name);
+
+                if (!File.Exists(entryCachePath))
+                    entry.ExtractToFile(entryCachePath, overwrite: false);
+            }
+        }
+        finally
+        {
+            if (File.Exists(tempZip))
+                try { File.Delete(tempZip); } catch { }
+        }
+
+        if (!File.Exists(requiredCachePath))
+            throw new InvalidOperationException(
+                "The requested payload was not found inside the downloaded ZIP archive.");
+    }
+
+    // ── Filter ────────────────────────────────────────────────────────────────
+
     private static bool MatchFilter(string name, string filter)
     {
         if (string.IsNullOrEmpty(filter)) return true;
 
-        // Support simple glob patterns like *.elf
         if (filter.StartsWith('*'))
         {
             var suffix = filter[1..];

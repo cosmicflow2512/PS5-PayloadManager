@@ -139,6 +139,12 @@
                                                           SelectedItem="{Binding Payload, Mode=TwoWay}"
                                                           Width="190" FontSize="12"
                                                           SelectionChanged="CmbStepPayload_SelectionChanged"/>
+                                                <TextBlock Text="{Binding VersionLabel}"
+                                                           Foreground="{StaticResource FgSubtle}"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="11"
+                                                           FontStyle="Italic"
+                                                           Margin="5,0,0,0"/>
                                                 <TextBlock Text=" → "
                                                            Foreground="{StaticResource FgSubtle}"
                                                            VerticalAlignment="Center" FontSize="12"/>

@@ -128,6 +128,9 @@ public class GitHubClient
         return ext is ".lua" or ".elf" or ".bin";
     }
 
+    public static bool IsZipFile(string name)
+        => System.IO.Path.GetExtension(name).ToLowerInvariant() == ".zip";
+
     /// <summary>Returns top-level directory names in the repository root.</summary>
     public async Task<List<string>> GetRepoDirsAsync(string owner, string repo)
     {
@@ -139,13 +142,16 @@ public class GitHubClient
         catch { return new(); }
     }
 
-    /// <summary>Returns true if the repo has at least one release with a payload asset.</summary>
+    /// <summary>
+    /// Returns true if the repo has at least one release with a payload asset
+    /// (direct .elf/.bin/.lua or a .zip that may contain payloads).
+    /// </summary>
     public async Task<bool> HasReleasesAsync(string owner, string repo)
     {
         try
         {
             var releases = await GetReleasesAsync(owner, repo);
-            return releases.Any(r => r.Assets.Any(a => IsPayloadFile(a.Name)));
+            return releases.Any(r => r.Assets.Any(a => IsPayloadFile(a.Name) || IsZipFile(a.Name)));
         }
         catch { return false; }
     }
