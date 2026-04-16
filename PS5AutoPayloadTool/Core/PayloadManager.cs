@@ -1,5 +1,6 @@
 using System.IO;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using PS5AutoPayloadTool.Models;
 
 namespace PS5AutoPayloadTool.Core;
@@ -15,17 +16,18 @@ public class PayloadManager(GitHubClient github)
     // ── Scan ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Scans a source and returns (name, downloadUrl, version, size) tuples
+    /// Scans a source and returns (name, downloadUrl, version, size, hash?) tuples
     /// for all payload files found.  ZIP release assets are transparently
     /// unpacked: every .elf / .bin / .lua inside the archive is returned as
     /// a separate entry with a <c>zip:</c>-prefixed download URL.
+    /// Hash is the git blob SHA for folder sources; null for release/ZIP sources.
     /// </summary>
-    public async Task<List<(string Name, string DownloadUrl, string Version, long Size)>> ScanSourceAsync(
+    public async Task<List<(string Name, string DownloadUrl, string Version, long Size, string? Hash)>> ScanSourceAsync(
         SourceConfig source,
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
-        var results = new List<(string, string, string, long)>();
+        var results = new List<(string, string, string, long, string?)>();
 
         if (source.Type == "release")
         {
@@ -39,7 +41,7 @@ public class PayloadManager(GitHubClient github)
                     {
                         if (!string.IsNullOrEmpty(source.Filter) &&
                             !MatchFilter(asset.Name, source.Filter)) continue;
-                        results.Add((asset.Name, asset.BrowserDownloadUrl, release.TagName, asset.Size));
+                        results.Add((asset.Name, asset.BrowserDownloadUrl, release.TagName, asset.Size, null));
                     }
                     else if (GitHubClient.IsZipFile(asset.Name))
                     {
@@ -54,7 +56,7 @@ public class PayloadManager(GitHubClient github)
                                 if (!string.IsNullOrEmpty(source.Filter) &&
                                     !MatchFilter(entryName, source.Filter)) continue;
                                 var zipUrl = $"{ZipUrlPrefix}{asset.BrowserDownloadUrl}{ZipUrlSeparator}{entryPath}";
-                                results.Add((entryName, zipUrl, release.TagName, entrySize));
+                                results.Add((entryName, zipUrl, release.TagName, entrySize, null));
                                 anyPayload = true;
                             }
                             if (!anyPayload)
@@ -79,7 +81,8 @@ public class PayloadManager(GitHubClient github)
                 if (!GitHubClient.IsPayloadFile(file.Name)) continue;
                 if (!string.IsNullOrEmpty(source.Filter) &&
                     !MatchFilter(file.Name, source.Filter)) continue;
-                results.Add((file.Name, file.DownloadUrl, "folder", file.Size));
+                results.Add((file.Name, file.DownloadUrl, "folder", file.Size,
+                    string.IsNullOrEmpty(file.Sha) ? null : file.Sha));
             }
         }
 
@@ -143,6 +146,7 @@ public class PayloadManager(GitHubClient github)
         meta.LocalPath = activePath;
         meta.SourceUrl = sourceUrl;
         meta.Size      = new FileInfo(activePath).Length;
+        meta.FileHash  = ComputeSha256(activePath);
     }
 
     /// <summary>
@@ -164,7 +168,7 @@ public class PayloadManager(GitHubClient github)
         var found = await ScanSourceAsync(source, null, ct);
         var match = found.FirstOrDefault(f =>
             f.Name == name &&
-            (f.Version == version || version == "latest"));
+            (f.Version == version || version == "latest" || source.Type == "folder"));
 
         if (match == default)
             throw new InvalidOperationException($"Version '{version}' of '{name}' not found in source.");
@@ -248,6 +252,19 @@ public class PayloadManager(GitHubClient github)
         if (!File.Exists(requiredCachePath))
             throw new InvalidOperationException(
                 "The requested payload was not found inside the downloaded ZIP archive.");
+    }
+
+    // ── Hash ──────────────────────────────────────────────────────────────────
+
+    private static string ComputeSha256(string filePath)
+    {
+        try
+        {
+            using var stream = File.OpenRead(filePath);
+            var hash = SHA256.HashData(stream);
+            return Convert.ToHexString(hash).ToLowerInvariant();
+        }
+        catch { return ""; }
     }
 
     // ── Filter ────────────────────────────────────────────────────────────────

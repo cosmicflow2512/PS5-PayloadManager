@@ -246,7 +246,7 @@ public partial class SourcesPage : UserControl
             if (!MainWindow.Config.Sources.Any(s => s.Url == source.Url))
                 MainWindow.Config.Sources.Add(source);
 
-            foreach (var (name, _, version, size) in found)
+            foreach (var (name, _, version, size, _) in found)
             {
                 if (!MainWindow.Config.PayloadMeta.ContainsKey(name))
                     MainWindow.Config.PayloadMeta[name] = new PayloadMeta
@@ -277,7 +277,7 @@ public partial class SourcesPage : UserControl
         try
         {
             var found = await MainWindow.PayloadMgr.ScanSourceAsync(source, progress, CancellationToken.None);
-            foreach (var (name, _, version, size) in found)
+            foreach (var (name, _, version, size, _) in found)
             {
                 if (!MainWindow.Config.PayloadMeta.ContainsKey(name))
                     MainWindow.Config.PayloadMeta[name] = new PayloadMeta

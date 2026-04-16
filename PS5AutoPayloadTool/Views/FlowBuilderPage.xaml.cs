@@ -256,6 +256,36 @@ public partial class FlowBuilderPage : UserControl
     {
         if (_steps.Count == 0) { AppendLog("Flow is empty — nothing to export."); return; }
 
+        bool hasWait = _steps.Any(s => s.Type == "wait_port");
+        bool hasLua  = _steps.Any(s => s.Type == "payload"
+                           && s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
+
+        if (hasWait || hasLua)
+        {
+            var what = new List<string>();
+            if (hasWait) what.Add("WAIT step(s)");
+            if (hasLua)  what.Add("Lua payload(s)");
+            var whatStr = string.Join(" and ", what);
+
+            var answer = MessageBox.Show(
+                $"This flow contains {whatStr} which are not supported in autoload.txt.\n\n" +
+                "Remove incompatible steps and export anyway?",
+                "Incompatible Steps",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (answer != MessageBoxResult.Yes) return;
+
+            var toRemove = _steps
+                .Where(s => s.Type == "wait_port" ||
+                            (s.Type == "payload" && s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            foreach (var s in toRemove) _steps.Remove(s);
+            UpdateCompatibilityBadge();
+            SyncFlowToConfig();
+            AppendLog($"Removed {toRemove.Count} incompatible step(s) before export.");
+        }
+
         var elfSteps = _steps
             .Where(s => s.Type == "payload"
                      && !s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
@@ -266,15 +296,6 @@ public partial class FlowBuilderPage : UserControl
             AppendLog("No valid payloads for autoload export (need .elf or .bin).");
             return;
         }
-
-        bool hasWait = _steps.Any(s => s.Type == "wait_port");
-        bool hasLua  = _steps.Any(s => s.Type == "payload"
-                           && s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
-
-        if (hasWait)
-            AppendLog("Warning: WAIT steps are not supported in autoload.txt and will be skipped.");
-        if (hasLua)
-            AppendLog("Warning: Lua payloads are not supported in autoload export and will be skipped.");
 
         var sb = new StringBuilder();
         foreach (var step in _steps)

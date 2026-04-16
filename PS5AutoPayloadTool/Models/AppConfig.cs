@@ -176,6 +176,13 @@ public class PayloadMeta
     [JsonPropertyName("local_path")]
     public string LocalPath { get; set; } = "";
 
+    /// <summary>
+    /// SHA256 hex digest of the locally cached file.
+    /// Compared against the remote git blob SHA (folder sources) to detect updates.
+    /// </summary>
+    [JsonPropertyName("file_hash")]
+    public string FileHash { get; set; } = "";
+
     [JsonIgnore]
     public bool IsDownloaded => !string.IsNullOrEmpty(LocalPath) && File.Exists(LocalPath);
 
