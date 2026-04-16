@@ -4,6 +4,24 @@ using System.Text.Json.Serialization;
 
 namespace PS5AutoPayloadTool.Models;
 
+public class PortSettings
+{
+    [JsonPropertyName("elf_port")]
+    public int ElfPort { get; set; } = 9021;
+
+    [JsonPropertyName("lua_port")]
+    public int LuaPort { get; set; } = 9026;
+
+    /// <summary>
+    /// Optional separate port for .bin payloads.  0 means "use ElfPort".
+    /// </summary>
+    [JsonPropertyName("bin_port")]
+    public int BinPort { get; set; } = 0;
+
+    [JsonIgnore]
+    public int EffectiveBinPort => BinPort >= 1 && BinPort <= 65535 ? BinPort : ElfPort;
+}
+
 public class AppConfig
 {
     [JsonPropertyName("version")]
@@ -23,6 +41,9 @@ public class AppConfig
 
     [JsonPropertyName("devices")]
     public List<DeviceConfig> Devices { get; set; } = new();
+
+    [JsonPropertyName("ports")]
+    public PortSettings Ports { get; set; } = new();
 
     /// <summary>
     /// Unified accessor: returns devices[0].Ip if present, else state.PS5Ip.

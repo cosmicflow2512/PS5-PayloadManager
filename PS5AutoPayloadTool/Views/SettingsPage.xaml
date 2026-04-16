@@ -26,6 +26,59 @@
                 </StackPanel>
             </Border>
 
+            <!-- ── Payload Ports ────────────────────────────────────── -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="PAYLOAD PORTS" Style="{StaticResource SectionTitle}"/>
+                    <TextBlock Text="Default ports used when auto-filling payload steps and checking PS5 connectivity."
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="12" TextWrapping="Wrap"
+                               Margin="0,0,0,12"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="ELF Port"
+                                       Foreground="{StaticResource FgSubtle}"
+                                       FontSize="11" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtElfPort" FontFamily="Consolas"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="LUA Port"
+                                       Foreground="{StaticResource FgSubtle}"
+                                       FontSize="11" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtLuaPort" FontFamily="Consolas"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="BIN Port (optional)"
+                                       Foreground="{StaticResource FgSubtle}"
+                                       FontSize="11" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtBinPort" FontFamily="Consolas"/>
+                            <TextBlock Text="0 = use ELF port"
+                                       Foreground="{StaticResource FgSubtle}"
+                                       FontSize="10" FontStyle="Italic"
+                                       Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Button x:Name="BtnSavePorts"
+                            Content="Save Port Settings"
+                            Style="{StaticResource BtnAccent}"
+                            HorizontalAlignment="Left"
+                            Margin="0,12,0,0"
+                            Click="BtnSavePorts_Click"/>
+                </StackPanel>
+            </Border>
+
             <!-- ── PS5 Devices ──────────────────────────────────────── -->
             <Border Style="{StaticResource Card}">
                 <StackPanel>

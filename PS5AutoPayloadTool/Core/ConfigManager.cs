@@ -37,6 +37,7 @@ public static class ConfigManager
             config.Profiles     ??= new();
             config.Devices      ??= new();
             config.State        ??= new();
+            config.Ports        ??= new();
             SyncProfilesToDisk(config);
             return config;
         }
@@ -293,6 +294,17 @@ public static class ConfigManager
             foreach (var p in profEl.EnumerateObject())
                 if (p.Value.ValueKind == JsonValueKind.String)
                     config.Profiles[p.Name] = p.Value.GetString() ?? "";
+        }
+
+        // ── ports ─────────────────────────────────────────────────────────────
+        if (root.TryGetProperty("ports", out var portsEl) && portsEl.ValueKind == JsonValueKind.Object)
+        {
+            if (portsEl.TryGetProperty("elf_port", out var ep) && ep.ValueKind == JsonValueKind.Number)
+                config.Ports.ElfPort = ep.GetInt32();
+            if (portsEl.TryGetProperty("lua_port", out var lp) && lp.ValueKind == JsonValueKind.Number)
+                config.Ports.LuaPort = lp.GetInt32();
+            if (portsEl.TryGetProperty("bin_port", out var bp) && bp.ValueKind == JsonValueKind.Number)
+                config.Ports.BinPort = bp.GetInt32();
         }
 
         return config;

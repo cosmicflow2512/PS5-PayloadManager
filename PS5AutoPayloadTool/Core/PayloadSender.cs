@@ -1,5 +1,6 @@
 using System.IO;
 using System.Net.Sockets;
+using PS5AutoPayloadTool.Models;
 
 namespace PS5AutoPayloadTool.Core;
 
@@ -10,13 +11,24 @@ public static class PayloadSender
     private const int ChunkSize = 4096;
 
     /// <summary>
-    /// Returns the default port for a given filename:
-    /// .lua  -> 9026 (Lua/Userland loader)
-    /// .elf / .bin -> 9021 (ELF loader)
+    /// Returns the default port for a given filename, respecting user-configured
+    /// port settings when provided:
+    ///   .lua → LuaPort  (default 9026)
+    ///   .bin → BinPort if set, otherwise ElfPort  (default 9021)
+    ///   .elf / other → ElfPort  (default 9021)
     /// </summary>
-    public static int GetDefaultPort(string filename)
+    public static int GetDefaultPort(string filename, PortSettings? ports = null)
     {
         var ext = Path.GetExtension(filename).ToLowerInvariant();
+        if (ports != null)
+        {
+            return ext switch
+            {
+                ".lua" => ports.LuaPort,
+                ".bin" => ports.EffectiveBinPort,
+                _      => ports.ElfPort
+            };
+        }
         return ext == ".lua" ? 9026 : 9021;
     }
 
@@ -41,7 +53,6 @@ public static class PayloadSender
         {
             using var client = new TcpClient();
 
-            // ConnectAsync(string, int) returns Task — use WhenAny for timeout
             var connectTask = client.ConnectAsync(host, port);
             var timeoutTask = Task.Delay(timeoutMs, cancellationToken);
             var winner = await Task.WhenAny(connectTask, timeoutTask);
@@ -60,7 +71,7 @@ public static class PayloadSender
                 cancellationToken.ThrowIfCancellationRequested();
                 int count = Math.Min(ChunkSize, data.Length - offset);
                 await stream.WriteAsync(data.AsMemory(offset, count), cancellationToken);
-                offset += count;
+                offset    += count;
                 bytesSent += count;
                 progress?.Report((bytesSent, data.Length));
             }

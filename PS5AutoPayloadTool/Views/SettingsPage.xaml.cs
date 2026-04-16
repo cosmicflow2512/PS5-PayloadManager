@@ -33,6 +33,11 @@ public partial class SettingsPage : UserControl
         long cacheBytes = GetDirSize(AppPaths.CacheDir);
         TxtStats.Text = $"{payloadCount} payload(s)  •  {profileCount} profile(s)  •  cache {FormatBytes(cacheBytes)}";
 
+        // Port settings
+        TxtElfPort.Text = MainWindow.Config.Ports.ElfPort.ToString();
+        TxtLuaPort.Text = MainWindow.Config.Ports.LuaPort.ToString();
+        TxtBinPort.Text = MainWindow.Config.Ports.BinPort.ToString();
+
         _loading = false;
         TxtStatus.Text = "";
     }
@@ -118,6 +123,69 @@ public partial class SettingsPage : UserControl
         MainWindow.SaveConfig();
         RefreshDevices();
         SaveAndNotify();
+    }
+
+    // ── Port settings ────────────────────────────────────────────────────────
+
+    private void BtnSavePorts_Click(object sender, RoutedEventArgs e)
+    {
+        // Validate ELF port
+        if (!int.TryParse(TxtElfPort.Text.Trim(), out var newElf) || newElf < 1 || newElf > 65535)
+        {
+            TxtStatus.Text = "ELF port must be 1–65535.";
+            TxtElfPort.Text = MainWindow.Config.Ports.ElfPort.ToString();
+            return;
+        }
+
+        // Validate LUA port
+        if (!int.TryParse(TxtLuaPort.Text.Trim(), out var newLua) || newLua < 1 || newLua > 65535)
+        {
+            TxtStatus.Text = "LUA port must be 1–65535.";
+            TxtLuaPort.Text = MainWindow.Config.Ports.LuaPort.ToString();
+            return;
+        }
+
+        // Validate BIN port (0 is allowed — means "use ELF port")
+        var binText = TxtBinPort.Text.Trim();
+        if (string.IsNullOrEmpty(binText)) binText = "0";
+        if (!int.TryParse(binText, out var newBin) || newBin < 0 || newBin > 65535)
+        {
+            TxtStatus.Text = "BIN port must be 0 or 1–65535.";
+            TxtBinPort.Text = MainWindow.Config.Ports.BinPort.ToString();
+            return;
+        }
+
+        bool changed = newElf != MainWindow.Config.Ports.ElfPort ||
+                       newLua != MainWindow.Config.Ports.LuaPort ||
+                       newBin != MainWindow.Config.Ports.BinPort;
+
+        MainWindow.Config.Ports.ElfPort = newElf;
+        MainWindow.Config.Ports.LuaPort = newLua;
+        MainWindow.Config.Ports.BinPort = newBin;
+        MainWindow.SaveConfig();
+        TxtStatus.Text = "Port settings saved.";
+
+        if (!changed) return;
+
+        // Offer to update existing builder payload steps
+        var payloadSteps = MainWindow.Config.State.BuilderSteps
+            .Where(s => s.Type == "payload").ToList();
+
+        if (payloadSteps.Count == 0) return;
+
+        var result = MessageBox.Show(
+            $"Apply new port settings to {payloadSteps.Count} existing builder step(s)?",
+            "Update Builder Steps",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        foreach (var step in payloadSteps)
+            step.Port = PayloadSender.GetDefaultPort(step.Payload, MainWindow.Config.Ports);
+
+        MainWindow.SaveConfig();
+        TxtStatus.Text = $"Port settings saved. {payloadSteps.Count} step(s) updated.";
     }
 
     // ── Data folder ──────────────────────────────────────────────────────────

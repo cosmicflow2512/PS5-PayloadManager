@@ -25,6 +25,7 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <TextBlock Grid.Column="0"
@@ -33,7 +34,36 @@
                                VerticalAlignment="Center"
                                Margin="0"/>
 
-                    <StackPanel Grid.Column="1"
+                    <!-- Autoload compatibility badge -->
+                    <Border x:Name="CompatBadge"
+                            Grid.Column="1"
+                            CornerRadius="4"
+                            Padding="8,4"
+                            Margin="0,0,10,0"
+                            VerticalAlignment="Center"
+                            Cursor="Help">
+                        <Border.ToolTip>
+                            <ToolTip MaxWidth="320">
+                                <StackPanel>
+                                    <TextBlock Text="Autoload TXT limitations:"
+                                               FontWeight="SemiBold"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="• WAIT (port-based) steps are not supported"
+                                               Margin="0,0,0,2"/>
+                                    <TextBlock Text="• LUA payloads are not supported"
+                                               Margin="0,0,0,2"/>
+                                    <TextBlock Text="• Only ELF and BIN payloads are allowed"
+                                               Margin="0,0,0,2"/>
+                                    <TextBlock Text="• Execution is strictly sequential (no port checks)"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <TextBlock x:Name="TxtCompatBadge"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="2"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center"
                                 Margin="0,0,10,0">
@@ -41,7 +71,8 @@
                                  Width="8" Height="8"
                                  Fill="{StaticResource BgOverlay}"
                                  Margin="0,0,4,0"/>
-                        <TextBlock Text="Lua"
+                        <TextBlock x:Name="TxtLuaPortLabel"
+                                   Text="Lua"
                                    Foreground="{StaticResource FgSubtle}"
                                    FontSize="11" VerticalAlignment="Center"
                                    Margin="0,0,10,0"/>
@@ -49,12 +80,13 @@
                                  Width="8" Height="8"
                                  Fill="{StaticResource BgOverlay}"
                                  Margin="0,0,4,0"/>
-                        <TextBlock Text="ELF"
+                        <TextBlock x:Name="TxtElfPortLabel"
+                                   Text="ELF"
                                    Foreground="{StaticResource FgSubtle}"
                                    FontSize="11" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <ComboBox Grid.Column="2"
+                    <ComboBox Grid.Column="3"
                               x:Name="CmbDevice"
                               Width="200"
                               VerticalAlignment="Center"
@@ -67,7 +99,7 @@
                         </ComboBox.ItemTemplate>
                     </ComboBox>
 
-                    <Button Grid.Column="3"
+                    <Button Grid.Column="4"
                             Content="Check Ports"
                             Style="{StaticResource Btn}"
                             VerticalAlignment="Center"

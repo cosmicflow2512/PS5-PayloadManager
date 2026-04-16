@@ -20,16 +20,27 @@ public partial class FlowBuilderPage : UserControl
     // Exposed for DataTemplate RelativeSource bindings
     public List<string> PayloadNames { get; private set; } = new();
 
+    // Port indicator dots
     private static readonly SolidColorBrush _dotOff = new(Color.FromRgb(69,  71,  90));
     private static readonly SolidColorBrush _dotOn  = new(Color.FromRgb(166, 227, 161));
+
+    // Compatibility badge colours
+    private static readonly SolidColorBrush _badgeBgCompat   = new(Color.FromRgb(30,  58,  47));
+    private static readonly SolidColorBrush _badgeBgIncompat  = new(Color.FromRgb(58,  30,  30));
+    private static readonly SolidColorBrush _badgeFgCompat   = new(Color.FromRgb(166, 227, 161));
+    private static readonly SolidColorBrush _badgeFgIncompat  = new(Color.FromRgb(243, 139, 168));
 
     public FlowBuilderPage()
     {
         DataContext = this;
         InitializeComponent();
         FlowStepsList.ItemsSource = _steps;
-        _steps.CollectionChanged += (_, _) => UpdateEmptyHint();
-        _engine.ProgressChanged  += OnEngineProgress;
+        _steps.CollectionChanged += (_, _) =>
+        {
+            UpdateEmptyHint();
+            UpdateCompatibilityBadge();
+        };
+        _engine.ProgressChanged += OnEngineProgress;
     }
 
     // ── Public: load steps from ProfilesPage edit ────────────────────────────
@@ -43,6 +54,7 @@ public partial class FlowBuilderPage : UserControl
             TxtSaveName.Text = profileName;
         UpdateEmptyHint();
         _loading = false;
+        UpdateCompatibilityBadge();
         UpdateVersionLabels();
         SyncFlowToConfig();
     }
@@ -66,8 +78,14 @@ public partial class FlowBuilderPage : UserControl
         foreach (var s in MainWindow.Config.State.BuilderSteps)
             _steps.Add(s);
 
+        // Update port labels with configured values
+        var ports = MainWindow.Config.Ports;
+        TxtLuaPortLabel.Text = $"Lua {ports.LuaPort}";
+        TxtElfPortLabel.Text = $"ELF {ports.ElfPort}";
+
         UpdateEmptyHint();
         _loading = false;
+        UpdateCompatibilityBadge();
         UpdateVersionLabels();
     }
 
@@ -78,6 +96,20 @@ public partial class FlowBuilderPage : UserControl
     {
         if (CmbDevice.SelectedItem is DeviceConfig dev) return dev.Ip;
         return MainWindow.Config.PS5Host;
+    }
+
+    // ── Compatibility badge ──────────────────────────────────────────────────
+
+    private void UpdateCompatibilityBadge()
+    {
+        bool hasWait = _steps.Any(s => s.Type == "wait_port");
+        bool hasLua  = _steps.Any(s => s.Type == "payload" &&
+                       s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
+        bool ok = !hasWait && !hasLua;
+
+        CompatBadge.Background    = ok ? _badgeBgCompat  : _badgeBgIncompat;
+        TxtCompatBadge.Foreground = ok ? _badgeFgCompat  : _badgeFgIncompat;
+        TxtCompatBadge.Text       = ok ? "✓ Autoload Compatible" : "✗ Not Compatible";
     }
 
     // ── Device selection ─────────────────────────────────────────────────────
@@ -97,9 +129,11 @@ public partial class FlowBuilderPage : UserControl
 
     private async void BtnCheckPorts_Click(object sender, RoutedEventArgs e)
     {
-        var host    = GetSelectedHost();
-        var luaTask = PortChecker.CheckPortAsync(host, 9026, 2_000);
-        var elfTask = PortChecker.CheckPortAsync(host, 9021, 2_000);
+        var host  = GetSelectedHost();
+        var ports = MainWindow.Config.Ports;
+
+        var luaTask = PortChecker.CheckPortAsync(host, ports.LuaPort, 2_000);
+        var elfTask = PortChecker.CheckPortAsync(host, ports.ElfPort, 2_000);
         await Task.WhenAll(luaTask, elfTask);
 
         bool luaOpen = luaTask.Result, elfOpen = elfTask.Result;
@@ -109,7 +143,8 @@ public partial class FlowBuilderPage : UserControl
         if (Window.GetWindow(this) is MainWindow mw)
             mw.SetPortIndicators(luaOpen, elfOpen);
 
-        AppendLog($"Lua 9026: {(luaOpen ? "OPEN" : "closed")}   ELF 9021: {(elfOpen ? "OPEN" : "closed")}");
+        AppendLog($"Lua {ports.LuaPort}: {(luaOpen ? "OPEN" : "closed")}   " +
+                  $"ELF {ports.ElfPort}: {(elfOpen ? "OPEN" : "closed")}");
     }
 
     // ── Instant add step buttons ──────────────────────────────────────────────
@@ -117,14 +152,16 @@ public partial class FlowBuilderPage : UserControl
     private void BtnAddPayload_Click(object sender, RoutedEventArgs e)
     {
         var first = PayloadNames.FirstOrDefault() ?? "";
-        var port  = string.IsNullOrEmpty(first) ? 9021 : PayloadSender.GetDefaultPort(first);
+        var port  = PayloadSender.GetDefaultPort(first, MainWindow.Config.Ports);
         _steps.Add(new BuilderStep { Type = "payload", Payload = first, Port = port });
+        UpdateCompatibilityBadge();
         SyncFlowToConfig();
     }
 
     private void BtnAddWait_Click(object sender, RoutedEventArgs e)
     {
-        _steps.Add(new BuilderStep { Type = "wait_port", Port = 9021, Timeout = 60 });
+        _steps.Add(new BuilderStep { Type = "wait_port", Port = MainWindow.Config.Ports.ElfPort, Timeout = 60 });
+        UpdateCompatibilityBadge();
         SyncFlowToConfig();
     }
 
@@ -141,7 +178,8 @@ public partial class FlowBuilderPage : UserControl
         if (sender is not ComboBox cb) return;
         if (cb.DataContext is BuilderStep step && cb.SelectedItem is string name)
         {
-            step.Port = PayloadSender.GetDefaultPort(name);
+            step.Port = PayloadSender.GetDefaultPort(name, MainWindow.Config.Ports);
+            UpdateCompatibilityBadge();
             UpdateVersionLabels();
             SyncFlowToConfig();
         }
@@ -170,6 +208,7 @@ public partial class FlowBuilderPage : UserControl
     {
         if (sender is not Button btn || btn.Tag is not BuilderStep step) return;
         _steps.Remove(step);
+        UpdateCompatibilityBadge();
         SyncFlowToConfig();
     }
 
@@ -217,7 +256,6 @@ public partial class FlowBuilderPage : UserControl
     {
         if (_steps.Count == 0) { AppendLog("Flow is empty — nothing to export."); return; }
 
-        // Validate: at least one ELF/BIN payload
         var elfSteps = _steps
             .Where(s => s.Type == "payload"
                      && !s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
@@ -229,7 +267,6 @@ public partial class FlowBuilderPage : UserControl
             return;
         }
 
-        // Warnings for unsupported content
         bool hasWait = _steps.Any(s => s.Type == "wait_port");
         bool hasLua  = _steps.Any(s => s.Type == "payload"
                            && s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
@@ -239,8 +276,6 @@ public partial class FlowBuilderPage : UserControl
         if (hasLua)
             AppendLog("Warning: Lua payloads are not supported in autoload export and will be skipped.");
 
-        // Build autoload.txt content
-        //  Format: !<ms>  then  filename   (no wait, no lua)
         var sb = new StringBuilder();
         foreach (var step in _steps)
         {
@@ -249,10 +284,8 @@ public partial class FlowBuilderPage : UserControl
             else if (step.Type == "payload"
                   && !step.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
                 sb.AppendLine(step.Payload);
-            // wait_port and lua → skip
         }
 
-        // Save dialog
         var dlg = new SaveFileDialog
         {
             Title    = "Export PS5 Autoload ZIP",
@@ -265,12 +298,10 @@ public partial class FlowBuilderPage : UserControl
         {
             using var zip = ZipFile.Open(dlg.FileName, ZipArchiveMode.Create);
 
-            // autoload.txt
             var txtEntry = zip.CreateEntry("ps5_autoloader/autoload.txt");
             using (var writer = new StreamWriter(txtEntry.Open()))
                 writer.Write(sb.ToString());
 
-            // Payload files
             int copied = 0;
             foreach (var step in elfSteps)
             {
@@ -364,8 +395,6 @@ public partial class FlowBuilderPage : UserControl
             if (MainWindow.Config.PayloadMeta.TryGetValue(step.Payload, out var meta)
                 && !string.IsNullOrEmpty(meta.Version))
             {
-                // The first entry in Versions is the newest (releases are fetched
-                // newest-first and the initial scan inserts it first).
                 var isLatest = meta.Versions.Count > 0 && meta.Versions[0] == meta.Version;
                 step.VersionLabel = isLatest ? "(Latest)" : $"({meta.Version})";
             }
