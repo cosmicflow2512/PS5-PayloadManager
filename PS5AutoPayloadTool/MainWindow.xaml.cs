@@ -34,8 +34,8 @@ public partial class MainWindow : Window
 
         InitializeComponent();
 
-        // Show sidebar host
-        SidebarHost.Text = Config.PS5Host;
+        // Show sidebar host/device
+        UpdateSidebarDevice();
 
         // Default page
         ContentArea.Content = _sourcesPage;
@@ -94,11 +94,20 @@ public partial class MainWindow : Window
     /// </summary>
     public void OnConfigChanged()
     {
-        SidebarHost.Text = Config.PS5Host;
-        GitHub           = new GitHubClient(string.IsNullOrWhiteSpace(Config.GitHubToken)
-                               ? null : Config.GitHubToken);
-        PayloadMgr       = new PayloadManager(GitHub);
+        UpdateSidebarDevice();
+        GitHub     = new GitHubClient(string.IsNullOrWhiteSpace(Config.GitHubToken)
+                         ? null : Config.GitHubToken);
+        PayloadMgr = new PayloadManager(GitHub);
         ConfigManager.Save(Config);
+    }
+
+    private void UpdateSidebarDevice()
+    {
+        var host   = Config.PS5Host;
+        var device = Config.Devices.FirstOrDefault(d => d.Ip == host);
+        SidebarDeviceName.Text = device?.DisplayName ?? (Config.Devices.Count > 0
+            ? Config.Devices[0].DisplayName : "No device");
+        SidebarHost.Text = host;
     }
 
     /// <summary>Update the sidebar port indicator dots.</summary>

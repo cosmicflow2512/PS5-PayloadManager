@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="PS5 AutoPayload Tool"
+        Icon="Assets/icon.ico"
         Height="700" Width="1050"
         MinHeight="520" MinWidth="800"
         Background="{StaticResource BgBase}"
@@ -102,14 +103,15 @@
             <!-- Sidebar Footer: PS5 IP + port dots -->
             <Border Grid.Row="3" Background="{StaticResource BgBase}" Padding="12,10">
                 <StackPanel>
-                    <TextBlock Text="PS5 Console"
-                               FontSize="10"
-                               Foreground="{StaticResource FgSubtle}"
-                               Margin="0,0,0,4"/>
+                    <TextBlock x:Name="SidebarDeviceName"
+                               Text="No device"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource FgMain}"
+                               Margin="0,0,0,2"/>
                     <TextBlock x:Name="SidebarHost"
                                Text="192.168.1.100"
-                               FontSize="11"
-                               Foreground="{StaticResource FgMain}"
+                               FontSize="10"
+                               Foreground="{StaticResource FgSubtle}"
                                Margin="0,0,0,6"/>
                     <StackPanel Orientation="Horizontal">
                         <Ellipse x:Name="SidebarLuaDot"
