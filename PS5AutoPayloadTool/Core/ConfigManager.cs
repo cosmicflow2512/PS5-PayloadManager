@@ -1,4 +1,5 @@
 using System.IO;
+using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using PS5AutoPayloadTool.Models;
@@ -60,6 +61,87 @@ public static class ConfigManager
     {
         SyncProfilesFromDisk(config);
         return JsonSerializer.Serialize(config, WriteOpts);
+    }
+
+    /// <summary>
+    /// Creates a portable backup ZIP at <paramref name="destPath"/>.
+    /// Always contains <c>config.json</c>.
+    /// When <paramref name="includePayloads"/> is true, every file in
+    /// <see cref="AppPaths.PayloadsDir"/> is added under <c>payloads/</c>.
+    /// </summary>
+    public static void ExportBackupZip(AppConfig config, bool includePayloads, string destPath)
+    {
+        SyncProfilesFromDisk(config);
+        var json = JsonSerializer.Serialize(config, WriteOpts);
+
+        using var zip = ZipFile.Open(destPath, ZipArchiveMode.Create);
+
+        // config.json
+        var cfgEntry = zip.CreateEntry("config.json");
+        using (var w = new StreamWriter(cfgEntry.Open()))
+            w.Write(json);
+
+        if (includePayloads && Directory.Exists(AppPaths.PayloadsDir))
+        {
+            foreach (var file in Directory.GetFiles(AppPaths.PayloadsDir))
+            {
+                var name  = Path.GetFileName(file);
+                var entry = zip.CreateEntry($"payloads/{name}");
+                using var dst = entry.Open();
+                using var src = File.OpenRead(file);
+                src.CopyTo(dst);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Imports a backup ZIP created by <see cref="ExportBackupZip"/>.
+    /// Extracts payload files to <see cref="AppPaths.PayloadsDir"/> and
+    /// updates <c>LocalPath</c> in each restored <see cref="PayloadMeta"/>.
+    /// Returns the parsed config, the list of restored payload names, and an
+    /// optional error string.
+    /// </summary>
+    public static (AppConfig? Config, string[] Restored, string? Error) ImportFromBackupZip(string zipPath)
+    {
+        try
+        {
+            using var zip = ZipFile.OpenRead(zipPath);
+
+            var cfgEntry = zip.GetEntry("config.json");
+            if (cfgEntry == null)
+                return (null, Array.Empty<string>(), "No config.json found in this ZIP.");
+
+            string json;
+            using (var r = new StreamReader(cfgEntry.Open()))
+                json = r.ReadToEnd();
+
+            var (config, err) = Import(json);
+            if (config == null) return (null, Array.Empty<string>(), err);
+
+            // Restore payload files
+            var restored = new List<string>();
+            Directory.CreateDirectory(AppPaths.PayloadsDir);
+
+            foreach (var entry in zip.Entries)
+            {
+                if (!entry.FullName.StartsWith("payloads/") || entry.Length == 0) continue;
+                var name = Path.GetFileName(entry.FullName);
+                if (string.IsNullOrEmpty(name)) continue;
+
+                var dest = Path.Combine(AppPaths.PayloadsDir, name);
+                entry.ExtractToFile(dest, overwrite: true);
+                restored.Add(name);
+
+                if (config.PayloadMeta.TryGetValue(name, out var meta))
+                    meta.LocalPath = dest;
+            }
+
+            return (config, restored.ToArray(), null);
+        }
+        catch (Exception ex)
+        {
+            return (null, Array.Empty<string>(), ex.Message);
+        }
     }
 
     /// <summary>

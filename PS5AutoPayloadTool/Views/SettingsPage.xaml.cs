@@ -26,12 +26,11 @@ public partial class SettingsPage : UserControl
 
         RefreshDevices();
 
-        // Stats
         var payloadCount = Directory.Exists(AppPaths.PayloadsDir)
             ? Directory.GetFiles(AppPaths.PayloadsDir).Length : 0;
         var profileCount = Directory.Exists(AppPaths.ProfilesDir)
             ? Directory.GetFiles(AppPaths.ProfilesDir, "*.txt").Length : 0;
-        long cacheBytes  = GetDirSize(AppPaths.CacheDir);
+        long cacheBytes = GetDirSize(AppPaths.CacheDir);
         TxtStats.Text = $"{payloadCount} payload(s)  •  {profileCount} profile(s)  •  cache {FormatBytes(cacheBytes)}";
 
         _loading = false;
@@ -82,7 +81,6 @@ public partial class SettingsPage : UserControl
             return;
         }
 
-        // Don't add duplicate IPs
         if (MainWindow.Config.Devices.Any(d => d.Ip == ip))
         {
             TxtStatus.Text = "A device with that IP already exists.";
@@ -91,7 +89,6 @@ public partial class SettingsPage : UserControl
 
         MainWindow.Config.Devices.Add(new DeviceConfig { Name = name, Ip = ip });
 
-        // If this is the first device, set it as the active host
         if (MainWindow.Config.Devices.Count == 1)
             MainWindow.Config.PS5Host = ip;
 
@@ -112,7 +109,6 @@ public partial class SettingsPage : UserControl
 
         MainWindow.Config.Devices.Remove(dev);
 
-        // If we removed the active device, switch to first remaining
         if (MainWindow.Config.PS5Host == dev.Ip)
         {
             var next = MainWindow.Config.Devices.FirstOrDefault();
@@ -124,58 +120,243 @@ public partial class SettingsPage : UserControl
         SaveAndNotify();
     }
 
-    // ── Buttons ──────────────────────────────────────────────────────────────
+    // ── Data folder ──────────────────────────────────────────────────────────
 
     private void BtnOpenFolder_Click(object sender, RoutedEventArgs e)
     {
         Process.Start(new ProcessStartInfo { FileName = AppPaths.Base, UseShellExecute = true });
     }
 
+    // ── Export ───────────────────────────────────────────────────────────────
+
+    /// <summary>Exports config + optional payload files as a portable ZIP backup.</summary>
+    private void BtnExportBackup_Click(object sender, RoutedEventArgs e)
+    {
+        bool includePayloads = ChkIncludePayloads.IsChecked == true;
+
+        var dlg = new SaveFileDialog
+        {
+            Title    = "Export Backup ZIP",
+            Filter   = "ZIP backup (*.zip)|*.zip",
+            FileName = "ps5autopayload-backup.zip"
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        try
+        {
+            ConfigManager.ExportBackupZip(MainWindow.Config, includePayloads, dlg.FileName);
+            var payloadCount = Directory.Exists(AppPaths.PayloadsDir)
+                ? Directory.GetFiles(AppPaths.PayloadsDir).Length : 0;
+            TxtStatus.Text = includePayloads
+                ? $"Backup exported ({payloadCount} payload(s) included)."
+                : "Backup exported (config only — payloads not included).";
+        }
+        catch (Exception ex)
+        {
+            TxtStatus.Text = $"Export failed: {ex.Message}";
+        }
+    }
+
+    /// <summary>Exports config as plain JSON (for HA compatibility).</summary>
     private void BtnExport_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new SaveFileDialog
         {
-            Title      = "Export Config",
-            Filter     = "JSON files (*.json)|*.json",
-            FileName   = "ps5autopayload-config.json"
+            Title    = "Export Config JSON",
+            Filter   = "JSON files (*.json)|*.json",
+            FileName = "ps5autopayload-config.json"
         };
         if (dlg.ShowDialog() != true) return;
-        var json = ConfigManager.Export(MainWindow.Config);
-        File.WriteAllText(dlg.FileName, json);
-        TxtStatus.Text = "Config exported.";
+        File.WriteAllText(dlg.FileName, ConfigManager.Export(MainWindow.Config));
+        TxtStatus.Text = "Config JSON exported.";
     }
 
-    private void BtnImport_Click(object sender, RoutedEventArgs e)
+    // ── Import ───────────────────────────────────────────────────────────────
+
+    private async void BtnImport_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new OpenFileDialog
         {
-            Title  = "Import Config",
-            Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*"
+            Title  = "Import Config or Backup",
+            Filter = "Backup files (*.zip;*.json)|*.zip;*.json|ZIP backup (*.zip)|*.zip|JSON config (*.json)|*.json|All files (*.*)|*.*"
         };
         if (dlg.ShowDialog() != true) return;
 
-        var json = File.ReadAllText(dlg.FileName);
-        var (imported, importError) = ConfigManager.Import(json);
-        if (imported == null)
+        AppConfig? imported;
+        string[]   restoredFromZip;
+
+        if (dlg.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
         {
-            MessageBox.Show($"Could not parse the config file.\n\n{importError}", "Import Error",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            var (cfg, restored, err) = ConfigManager.ImportFromBackupZip(dlg.FileName);
+            if (cfg == null)
+            {
+                MessageBox.Show($"Could not import backup.\n\n{err}", "Import Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            imported        = cfg;
+            restoredFromZip = restored;
+        }
+        else
+        {
+            var json = File.ReadAllText(dlg.FileName);
+            var (cfg, err) = ConfigManager.Import(json);
+            if (cfg == null)
+            {
+                MessageBox.Show($"Could not parse the config file.\n\n{err}", "Import Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            imported        = cfg;
+            restoredFromZip = Array.Empty<string>();
+        }
+
+        // Apply imported config
+        MainWindow.Config.PS5Host            = imported.PS5Host;
+        MainWindow.Config.GitHubToken        = imported.GitHubToken;
+        MainWindow.Config.Sources            = imported.Sources;
+        MainWindow.Config.PayloadMeta        = imported.PayloadMeta;
+        MainWindow.Config.Profiles           = imported.Profiles;
+        MainWindow.Config.Devices            = imported.Devices;
+        MainWindow.Config.State.BuilderSteps = imported.State.BuilderSteps;
+
+        // Fix up LocalPath for any payloads that already exist in PayloadsDir
+        // (covers payloads restored from ZIP and previously-downloaded payloads)
+        foreach (var kv in MainWindow.Config.PayloadMeta)
+        {
+            var localFile = Path.Combine(AppPaths.PayloadsDir, kv.Key);
+            if (File.Exists(localFile))
+                kv.Value.LocalPath = localFile;
+        }
+
+        (Window.GetWindow(this) as MainWindow)?.OnConfigChanged();
+        MainWindow.SaveConfig();
+        Refresh();
+
+        var zCount = restoredFromZip.Length;
+        TxtStatus.Text = zCount > 0
+            ? $"Imported. {zCount} payload(s) restored from backup. Resolving missing payloads…"
+            : "Config imported. Resolving missing payloads…";
+
+        // Auto-download any remaining missing payloads
+        await ResolvePayloadsAsync(new HashSet<string>(restoredFromZip, StringComparer.OrdinalIgnoreCase));
+    }
+
+    // ── Payload auto-resolution ──────────────────────────────────────────────
+
+    /// <summary>
+    /// After import, checks every payload in PayloadMeta.  Payloads in
+    /// <paramref name="alreadyRestored"/> or already present on disk are skipped.
+    /// For the rest, the tool tries to download from the registered source:
+    ///   1. exact version match
+    ///   2. any version of that payload (fallback to latest)
+    ///   3. if no source → warn and skip
+    /// </summary>
+    private async Task ResolvePayloadsAsync(HashSet<string> alreadyRestored)
+    {
+        // Collect payloads whose file is genuinely absent
+        var missing = MainWindow.Config.PayloadMeta
+            .Where(kv => !alreadyRestored.Contains(kv.Key)
+                      && !File.Exists(Path.Combine(AppPaths.PayloadsDir, kv.Key)))
+            .ToList();
+
+        if (missing.Count == 0)
+        {
+            HideRestoreProgress();
+            TxtStatus.Text = "Import complete. All payloads present.";
             return;
         }
 
-        // Overwrite current config
-        MainWindow.Config.PS5Host                = imported.PS5Host;
-        MainWindow.Config.GitHubToken            = imported.GitHubToken;
-        MainWindow.Config.Sources                = imported.Sources;
-        MainWindow.Config.PayloadMeta            = imported.PayloadMeta;
-        MainWindow.Config.Profiles               = imported.Profiles;
-        MainWindow.Config.Devices                = imported.Devices;
-        MainWindow.Config.State.BuilderSteps     = imported.State.BuilderSteps;
+        PrgRestore.Value      = 0;
+        PrgRestore.Visibility = Visibility.Visible;
+        TxtRestoreLog.Text    = "";
+        TxtRestoreLog.Visibility = Visibility.Visible;
 
-        (Window.GetWindow(this) as MainWindow)?.OnConfigChanged();
+        int resolved = 0;
+
+        for (int i = 0; i < missing.Count; i++)
+        {
+            var (name, meta) = missing[i];
+            PrgRestore.Value = (double)(i + 1) / missing.Count * 100;
+
+            // Re-check: might have been written as a side-effect of a sibling ZIP
+            var localFile = Path.Combine(AppPaths.PayloadsDir, name);
+            if (File.Exists(localFile))
+            {
+                meta.LocalPath = localFile;
+                resolved++;
+                AppendRestoreLog($"{name}: found locally.");
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(meta.SourceUrl))
+            {
+                AppendRestoreLog($"{name}: no source — skipped.");
+                continue;
+            }
+
+            var source = MainWindow.Config.Sources.FirstOrDefault(s => s.Url == meta.SourceUrl);
+            if (source == null)
+            {
+                AppendRestoreLog($"{name}: source not in config — skipped.");
+                continue;
+            }
+
+            try
+            {
+                TxtStatus.Text = $"Downloading {name}…";
+
+                var found = await MainWindow.PayloadMgr.ScanSourceAsync(source);
+
+                // Priority: exact version → any version (latest first)
+                var match = found.FirstOrDefault(f => f.Name == name && f.Version == meta.Version);
+                if (match == default)
+                    match = found.FirstOrDefault(f => f.Name == name);
+
+                if (match == default)
+                {
+                    AppendRestoreLog($"{name}: not found in source — skipped.");
+                    continue;
+                }
+
+                await MainWindow.PayloadMgr.DownloadAsync(
+                    MainWindow.Config, name, match.DownloadUrl, match.Version, source.Url);
+
+                if (match.Version != meta.Version && !string.IsNullOrEmpty(meta.Version))
+                    AppendRestoreLog($"{name}: updated to {match.Version} (requested {meta.Version}).");
+                else
+                    AppendRestoreLog($"{name}: restored ({match.Version}).");
+
+                resolved++;
+            }
+            catch (Exception ex)
+            {
+                AppendRestoreLog($"{name}: download failed — {ex.Message}");
+            }
+        }
+
+        MainWindow.SaveConfig();
         Refresh();
-        TxtStatus.Text = "Config imported.";
+        PrgRestore.Value = 100;
+
+        TxtStatus.Text = resolved == missing.Count
+            ? $"Import complete. All {resolved} missing payload(s) resolved."
+            : $"Import complete. {resolved}/{missing.Count} payload(s) resolved. See log above for details.";
     }
+
+    private void AppendRestoreLog(string line)
+    {
+        TxtRestoreLog.Text = string.IsNullOrEmpty(TxtRestoreLog.Text)
+            ? line : TxtRestoreLog.Text + "\n" + line;
+    }
+
+    private void HideRestoreProgress()
+    {
+        PrgRestore.Visibility    = Visibility.Collapsed;
+        TxtRestoreLog.Visibility = Visibility.Collapsed;
+    }
+
+    // ── Factory reset ────────────────────────────────────────────────────────
 
     private void BtnReset_Click(object sender, RoutedEventArgs e)
     {
@@ -184,13 +365,12 @@ public partial class SettingsPage : UserControl
             "Factory Reset", MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (result != MessageBoxResult.Yes) return;
 
-        MainWindow.Config.Sources              = new();
-        MainWindow.Config.PayloadMeta          = new();
-        MainWindow.Config.Profiles             = new();
-        MainWindow.Config.Devices              = new();
-        MainWindow.Config.State.BuilderSteps   = new();
+        MainWindow.Config.Sources            = new();
+        MainWindow.Config.PayloadMeta        = new();
+        MainWindow.Config.Profiles           = new();
+        MainWindow.Config.Devices            = new();
+        MainWindow.Config.State.BuilderSteps = new();
 
-        // Clear payload files and profiles
         if (Directory.Exists(AppPaths.PayloadsDir))
             foreach (var f in Directory.GetFiles(AppPaths.PayloadsDir))
                 try { File.Delete(f); } catch { }
@@ -205,6 +385,8 @@ public partial class SettingsPage : UserControl
         Refresh();
         TxtStatus.Text = "Reset complete.";
     }
+
+    // ── About ────────────────────────────────────────────────────────────────
 
     private void LnkGitHub_Click(object sender, MouseButtonEventArgs e)
     {
@@ -226,8 +408,8 @@ public partial class SettingsPage : UserControl
 
     private static string FormatBytes(long bytes)
     {
-        if (bytes < 1024) return $"{bytes} B";
-        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        if (bytes < 1024)             return $"{bytes} B";
+        if (bytes < 1024 * 1024)      return $"{bytes / 1024.0:F1} KB";
         return $"{bytes / 1024.0 / 1024.0:F1} MB";
     }
 }

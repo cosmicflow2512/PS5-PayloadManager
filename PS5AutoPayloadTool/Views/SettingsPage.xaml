@@ -162,16 +162,55 @@
                 <StackPanel>
                     <TextBlock Text="BACKUP &amp; RESTORE" Style="{StaticResource SectionTitle}"/>
 
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <Button Content="Export Config"
+                    <!-- Export row -->
+                    <TextBlock Text="Export"
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="11" FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <Button Content="Export Backup ZIP"
                                 Style="{StaticResource BtnAccent}"
-                                Click="BtnExport_Click" Margin="0,0,8,0"/>
-                        <Button Content="Import Config"
+                                Click="BtnExportBackup_Click" Margin="0,0,8,0"/>
+                        <Button Content="Export Config JSON"
                                 Style="{StaticResource Btn}"
-                                Click="BtnImport_Click"/>
+                                Click="BtnExport_Click"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <CheckBox x:Name="ChkIncludePayloads"
+                                  IsChecked="True"
+                                  Content="Include payload files in backup"
+                                  Foreground="{StaticResource FgSubtle}"
+                                  FontSize="12"
+                                  VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <Separator Background="{StaticResource BgSurface}" Margin="0,8"/>
+                    <!-- Import row -->
+                    <TextBlock Text="Import"
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="11" FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <TextBlock Text="Accepts backup ZIP or JSON config. Missing payloads are downloaded automatically."
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="12" TextWrapping="Wrap"
+                               Margin="0,0,0,8"/>
+                    <Button Content="Import Config or Backup"
+                            Style="{StaticResource Btn}"
+                            HorizontalAlignment="Left"
+                            Click="BtnImport_Click" Margin="0,0,0,4"/>
+
+                    <!-- Payload restore progress (hidden until import) -->
+                    <ProgressBar x:Name="PrgRestore"
+                                 Minimum="0" Maximum="100" Value="0"
+                                 Margin="0,6,0,0"
+                                 Visibility="Collapsed"/>
+                    <TextBlock x:Name="TxtRestoreLog"
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="11" FontFamily="Consolas"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"
+                               Visibility="Collapsed"/>
+
+                    <Separator Background="{StaticResource BgSurface}" Margin="0,12"/>
 
                     <TextBlock Text="Factory Reset removes all sources, payloads and profiles."
                                Foreground="{StaticResource FgSubtle}"
