@@ -18,86 +18,94 @@
                       HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="24,20,24,10">
 
-                <!-- ── Header ─────────────────────────────────────────── -->
-                <Grid Margin="0,0,0,16">
+                <!-- ── Header: flow name + device ────────────────────── -->
+                <Grid Margin="0,0,0,14">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="180"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Flow Builder"
+
+                    <TextBlock Grid.Column="0"
+                               Text="Flow Builder"
                                Style="{StaticResource PageTitle}"
                                VerticalAlignment="Center"
-                               Margin="0"/>
+                               Margin="0,0,12,0"/>
+
                     <TextBox Grid.Column="1"
                              x:Name="TxtFlowName"
-                             FontSize="16" FontWeight="SemiBold"
-                             Margin="16,0,0,0"
+                             FontSize="13" FontWeight="SemiBold"
                              VerticalAlignment="Center"
                              TextChanged="TxtFlowName_TextChanged"/>
+
+                    <!-- spacer -->
+                    <StackPanel Grid.Column="3"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Margin="0,0,10,0">
+                        <Ellipse x:Name="EllipseLua"
+                                 Width="8" Height="8"
+                                 Fill="{StaticResource BgOverlay}"
+                                 Margin="0,0,4,0"/>
+                        <TextBlock Text="Lua"
+                                   Foreground="{StaticResource FgSubtle}"
+                                   FontSize="11" VerticalAlignment="Center"
+                                   Margin="0,0,10,0"/>
+                        <Ellipse x:Name="EllipseElf"
+                                 Width="8" Height="8"
+                                 Fill="{StaticResource BgOverlay}"
+                                 Margin="0,0,4,0"/>
+                        <TextBlock Text="ELF"
+                                   Foreground="{StaticResource FgSubtle}"
+                                   FontSize="11" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <ComboBox Grid.Column="4"
+                              x:Name="CmbDevice"
+                              Width="200"
+                              VerticalAlignment="Center"
+                              Margin="0,0,8,0"
+                              SelectionChanged="CmbDevice_SelectionChanged">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <Button Grid.Column="5"
+                            Content="Check Ports"
+                            Style="{StaticResource Btn}"
+                            VerticalAlignment="Center"
+                            Click="BtnCheckPorts_Click"/>
                 </Grid>
 
-                <!-- ── Connection Row ────────────────────────────────── -->
-                <Border Style="{StaticResource Card}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="220"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+                <!-- ── Step toolbar ───────────────────────────────────── -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="+ Payload"
+                            Style="{StaticResource BtnAccent}"
+                            Padding="12,5" Margin="0,0,6,0"
+                            Click="BtnAddPayload_Click"/>
+                    <Button Content="+ Wait"
+                            Style="{StaticResource BtnYellow}"
+                            Padding="12,5" Margin="0,0,6,0"
+                            Click="BtnAddWait_Click"/>
+                    <Button Content="+ Delay"
+                            Style="{StaticResource BtnGreen}"
+                            Padding="12,5"
+                            Click="BtnAddDelay_Click"/>
+                </StackPanel>
 
-                        <TextBlock Grid.Column="0" Text="PS5 Device:"
-                                   Foreground="{StaticResource FgSubtle}"
-                                   VerticalAlignment="Center"
-                                   Margin="0,0,8,0"/>
-
-                        <ComboBox Grid.Column="1"
-                                  x:Name="CmbDevice"
-                                  DisplayMemberPath="DisplayName"
-                                  SelectionChanged="CmbDevice_SelectionChanged"/>
-
-                        <StackPanel Grid.Column="2"
-                                    Orientation="Horizontal"
-                                    VerticalAlignment="Center"
-                                    Margin="14,0">
-                            <Ellipse x:Name="EllipseLua"
-                                     Width="9" Height="9"
-                                     Fill="{StaticResource BgOverlay}"
-                                     Margin="0,0,5,0"/>
-                            <TextBlock Text="Lua 9026"
-                                       Foreground="{StaticResource FgSubtle}"
-                                       FontSize="11"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,12,0"/>
-                            <Ellipse x:Name="EllipseElf"
-                                     Width="9" Height="9"
-                                     Fill="{StaticResource BgOverlay}"
-                                     Margin="0,0,5,0"/>
-                            <TextBlock Text="ELF 9021"
-                                       Foreground="{StaticResource FgSubtle}"
-                                       FontSize="11"
-                                       VerticalAlignment="Center"/>
-                        </StackPanel>
-
-                        <Button Grid.Column="4"
-                                Content="Check Ports"
-                                Style="{StaticResource Btn}"
-                                Click="BtnCheckPorts_Click"/>
-                    </Grid>
-                </Border>
-
-                <!-- ── Flow Steps ─────────────────────────────────────── -->
-                <Border Style="{StaticResource Card}">
+                <!-- ── Flow steps list ────────────────────────────────── -->
+                <Border Style="{StaticResource Card}" Padding="10">
                     <StackPanel>
-                        <TextBlock Text="Flow Steps"
-                                   Style="{StaticResource SectionTitle}"/>
-
                         <TextBlock x:Name="TxtFlowEmpty"
-                                   Text="No steps yet. Use the sections below to add steps."
+                                   Text="No steps yet — click + Payload, + Wait or + Delay above."
                                    Foreground="{StaticResource FgSubtle}"
-                                   FontSize="12"
-                                   Margin="0,0,0,8"
+                                   FontSize="12" Margin="4,4,4,0"
                                    Visibility="Visible"/>
 
                         <ItemsControl x:Name="FlowStepsList">
@@ -106,12 +114,12 @@
                                     <Border Background="{StaticResource BgBase}"
                                             BorderBrush="{StaticResource BgSurface}"
                                             BorderThickness="1"
-                                            CornerRadius="6"
-                                            Padding="10,8"
-                                            Margin="0,0,0,6">
+                                            CornerRadius="5"
+                                            Padding="8,6"
+                                            Margin="0,0,0,4">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="64"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
@@ -119,156 +127,124 @@
                                             <!-- Type badge -->
                                             <Border Grid.Column="0"
                                                     Background="#313244"
-                                                    CornerRadius="4"
-                                                    Padding="6,2"
-                                                    Margin="0,0,10,0"
-                                                    VerticalAlignment="Center">
+                                                    CornerRadius="3"
+                                                    Padding="5,2"
+                                                    VerticalAlignment="Center"
+                                                    HorizontalAlignment="Left">
                                                 <TextBlock Text="{Binding TypeLabel}"
                                                            Foreground="{Binding TypeColor, Converter={StaticResource StringToBrush}}"
-                                                           FontSize="10"
-                                                           FontWeight="SemiBold"/>
+                                                           FontSize="10" FontWeight="SemiBold"/>
                                             </Border>
 
-                                            <!-- Display text -->
-                                            <TextBlock Grid.Column="1"
-                                                       Text="{Binding DisplayText}"
-                                                       Foreground="{StaticResource FgMain}"
-                                                       FontSize="12"
-                                                       FontFamily="Consolas"
-                                                       VerticalAlignment="Center"/>
+                                            <!-- ── PAYLOAD inline content ── -->
+                                            <StackPanel x:Name="PayloadPanel"
+                                                        Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        VerticalAlignment="Center"
+                                                        Margin="6,0"
+                                                        Visibility="Collapsed">
+                                                <ComboBox x:Name="CmbStepPayload"
+                                                          ItemsSource="{Binding DataContext.PayloadNames,
+                                                              RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                          SelectedItem="{Binding Payload, Mode=TwoWay}"
+                                                          Width="180" FontSize="12"
+                                                          SelectionChanged="CmbStepPayload_SelectionChanged"/>
+                                                <TextBlock Text=" → "
+                                                           Foreground="{StaticResource FgSubtle}"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="12"/>
+                                                <TextBox Text="{Binding Port, Mode=TwoWay,
+                                                             UpdateSourceTrigger=LostFocus}"
+                                                         Width="55" FontFamily="Consolas"
+                                                         LostFocus="StepField_LostFocus"/>
+                                            </StackPanel>
 
-                                            <!-- Controls -->
+                                            <!-- ── WAIT inline content ── -->
+                                            <StackPanel x:Name="WaitPanel"
+                                                        Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        VerticalAlignment="Center"
+                                                        Margin="6,0"
+                                                        Visibility="Collapsed">
+                                                <TextBlock Text="Port:"
+                                                           Foreground="{StaticResource FgSubtle}"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="12" Margin="0,0,5,0"/>
+                                                <TextBox Text="{Binding Port, Mode=TwoWay,
+                                                             UpdateSourceTrigger=LostFocus}"
+                                                         Width="55" FontFamily="Consolas"
+                                                         LostFocus="StepField_LostFocus"/>
+                                                <TextBlock Text="  Timeout:"
+                                                           Foreground="{StaticResource FgSubtle}"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="12" Margin="8,0,5,0"/>
+                                                <TextBox Text="{Binding Timeout, Mode=TwoWay,
+                                                             UpdateSourceTrigger=LostFocus}"
+                                                         Width="45" FontFamily="Consolas"
+                                                         LostFocus="StepField_LostFocus"/>
+                                                <TextBlock Text=" s"
+                                                           Foreground="{StaticResource FgSubtle}"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="12"/>
+                                            </StackPanel>
+
+                                            <!-- ── DELAY inline content ── -->
+                                            <StackPanel x:Name="DelayPanel"
+                                                        Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        VerticalAlignment="Center"
+                                                        Margin="6,0"
+                                                        Visibility="Collapsed">
+                                                <TextBox Text="{Binding Ms, Mode=TwoWay,
+                                                             UpdateSourceTrigger=LostFocus}"
+                                                         Width="70" FontFamily="Consolas"
+                                                         LostFocus="StepField_LostFocus"/>
+                                                <TextBlock Text=" ms"
+                                                           Foreground="{StaticResource FgSubtle}"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="12"/>
+                                            </StackPanel>
+
+                                            <!-- Action buttons -->
                                             <StackPanel Grid.Column="2"
                                                         Orientation="Horizontal"
                                                         VerticalAlignment="Center">
-                                                <Button Content="▲"
+                                                <Button Content="↑"
                                                         Style="{StaticResource Btn}"
-                                                        Padding="6,2"
-                                                        Margin="0,0,2,0"
+                                                        Padding="5,2" Margin="0,0,2,0"
                                                         FontSize="10"
                                                         Tag="{Binding}"
                                                         Click="BtnMoveUp_Click"/>
-                                                <Button Content="▼"
+                                                <Button Content="↓"
                                                         Style="{StaticResource Btn}"
-                                                        Padding="6,2"
-                                                        Margin="0,0,2,0"
+                                                        Padding="5,2" Margin="0,0,2,0"
                                                         FontSize="10"
                                                         Tag="{Binding}"
                                                         Click="BtnMoveDown_Click"/>
                                                 <Button Content="✕"
                                                         Style="{StaticResource BtnDanger}"
-                                                        Padding="6,2"
+                                                        Padding="5,2"
                                                         FontSize="10"
                                                         Tag="{Binding}"
                                                         Click="BtnRemoveStep_Click"/>
                                             </StackPanel>
                                         </Grid>
                                     </Border>
+
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Type}" Value="payload">
+                                            <Setter TargetName="PayloadPanel" Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Type}" Value="wait_port">
+                                            <Setter TargetName="WaitPanel" Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Type}" Value="delay">
+                                            <Setter TargetName="DelayPanel" Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </StackPanel>
-                </Border>
-
-                <!-- ── Add Payload Step ──────────────────────────────── -->
-                <Border Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="+ Payload Step"
-                                   Style="{StaticResource SectionTitle}"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="12"/>
-                                <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="12"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Payload"
-                                           Foreground="{StaticResource FgSubtle}"
-                                           FontSize="11" Margin="0,0,0,4"/>
-                                <ComboBox x:Name="CmbPayloadStep"/>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="Port"
-                                           Foreground="{StaticResource FgSubtle}"
-                                           FontSize="11" Margin="0,0,0,4"/>
-                                <TextBox x:Name="TxtPayloadPort" Text="9021"/>
-                            </StackPanel>
-
-                            <Button Grid.Column="4"
-                                    Content="Add"
-                                    Style="{StaticResource BtnAccent}"
-                                    VerticalAlignment="Bottom"
-                                    Click="BtnAddPayloadStep_Click"/>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <!-- ── Add Wait Step ─────────────────────────────────── -->
-                <Border Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="+ Wait Step"
-                                   Style="{StaticResource SectionTitle}"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="12"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="12"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Port"
-                                           Foreground="{StaticResource FgSubtle}"
-                                           FontSize="11" Margin="0,0,0,4"/>
-                                <TextBox x:Name="TxtWaitPort" Text="9021"/>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="Timeout (seconds)"
-                                           Foreground="{StaticResource FgSubtle}"
-                                           FontSize="11" Margin="0,0,0,4"/>
-                                <TextBox x:Name="TxtWaitTimeout" Text="60"/>
-                            </StackPanel>
-
-                            <Button Grid.Column="4"
-                                    Content="Add"
-                                    Style="{StaticResource BtnYellow}"
-                                    VerticalAlignment="Bottom"
-                                    Click="BtnAddWaitStep_Click"/>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <!-- ── Add Delay Step ────────────────────────────────── -->
-                <Border Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="+ Delay Step"
-                                   Style="{StaticResource SectionTitle}"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="200"/>
-                                <ColumnDefinition Width="12"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Delay (milliseconds)"
-                                           Foreground="{StaticResource FgSubtle}"
-                                           FontSize="11" Margin="0,0,0,4"/>
-                                <TextBox x:Name="TxtDelayMs" Text="500"/>
-                            </StackPanel>
-
-                            <Button Grid.Column="2"
-                                    Content="Add"
-                                    Style="{StaticResource BtnGreen}"
-                                    VerticalAlignment="Bottom"
-                                    Click="BtnAddDelayStep_Click"/>
-                        </Grid>
                     </StackPanel>
                 </Border>
 
@@ -300,25 +276,21 @@
                 </StackPanel>
 
                 <ProgressBar x:Name="PrgFlow"
-                             Minimum="0" Maximum="100"
-                             Value="0"
+                             Minimum="0" Maximum="100" Value="0"
                              Margin="0,0,0,6"/>
 
-                <!-- Scrollable log -->
                 <Border Background="{StaticResource BgBase}"
                         BorderBrush="{StaticResource BgSurface}"
-                        BorderThickness="1"
-                        CornerRadius="4"
-                        Height="90">
+                        BorderThickness="1" CornerRadius="4"
+                        Height="80">
                     <ScrollViewer x:Name="LogScroll"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
-                                  Padding="8,6">
+                                  Padding="8,5">
                         <TextBlock x:Name="TxtFlowLog"
                                    Text=""
                                    Foreground="{StaticResource FgSubtle}"
-                                   FontSize="11"
-                                   FontFamily="Consolas"
+                                   FontSize="11" FontFamily="Consolas"
                                    TextWrapping="Wrap"/>
                     </ScrollViewer>
                 </Border>
@@ -326,5 +298,4 @@
         </Border>
 
     </Grid>
-
 </UserControl>

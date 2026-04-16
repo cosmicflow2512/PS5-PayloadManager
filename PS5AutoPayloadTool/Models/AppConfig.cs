@@ -168,22 +168,45 @@ public class DeviceConfig
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Ip : $"{Name}  ({Ip})";
 }
 
-public class BuilderStep
+public class BuilderStep : System.ComponentModel.INotifyPropertyChanged
 {
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private void Notify(string p) => PropertyChanged?.Invoke(this, new(p));
+
     [JsonPropertyName("type")]
     public string Type { get; set; } = "";
 
+    private string _payload = "";
     [JsonPropertyName("payload")]
-    public string Payload { get; set; } = "";
+    public string Payload
+    {
+        get => _payload;
+        set { _payload = value; Notify(nameof(Payload)); }
+    }
 
+    private int _port = 9021;
     [JsonPropertyName("port")]
-    public int Port { get; set; } = 9021;
+    public int Port
+    {
+        get => _port;
+        set { _port = value; Notify(nameof(Port)); }
+    }
 
+    private int _ms = 1000;
     [JsonPropertyName("ms")]
-    public int Ms { get; set; } = 500;
+    public int Ms
+    {
+        get => _ms;
+        set { _ms = value; Notify(nameof(Ms)); }
+    }
 
+    private int _timeout = 60;
     [JsonPropertyName("timeout")]
-    public int Timeout { get; set; } = 60;
+    public int Timeout
+    {
+        get => _timeout;
+        set { _timeout = value; Notify(nameof(Timeout)); }
+    }
 
     [JsonPropertyName("interval_ms")]
     public int IntervalMs { get; set; } = 500;

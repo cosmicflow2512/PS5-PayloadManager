@@ -8,8 +8,9 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>PS5AutoPayloadTool</AssemblyName>
     <RootNamespace>PS5AutoPayloadTool</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Company>cosmicflow2512</Company>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <Product>PS5 AutoPayload Tool</Product>
     <Description>Windows payload sender tool for PS5 homebrew automation</Description>
 
@@ -29,5 +30,9 @@
     <!-- No console window -->
     <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\icon.ico"/>
+  </ItemGroup>
 
 </Project>

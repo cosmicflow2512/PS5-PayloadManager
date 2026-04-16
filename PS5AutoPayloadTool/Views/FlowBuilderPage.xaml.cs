@@ -14,11 +14,15 @@ public partial class FlowBuilderPage : UserControl
     private readonly ExecEngine _engine = new();
     private bool _loading;
 
+    // Exposed for DataTemplate RelativeSource bindings
+    public List<string> PayloadNames { get; private set; } = new();
+
     private static readonly SolidColorBrush _dotOff = new(Color.FromRgb(69,  71,  90));
     private static readonly SolidColorBrush _dotOn  = new(Color.FromRgb(166, 227, 161));
 
     public FlowBuilderPage()
     {
+        DataContext = this;
         InitializeComponent();
         FlowStepsList.ItemsSource = _steps;
         _steps.CollectionChanged += (_, _) => UpdateEmptyHint();
@@ -29,46 +33,34 @@ public partial class FlowBuilderPage : UserControl
     {
         _loading = true;
 
-        // Flow name
         TxtFlowName.Text = MainWindow.Config.State.BuilderProfileName;
+
+        // Payload names list for inline combos
+        PayloadNames = MainWindow.Config.PayloadMeta.Keys.ToList();
 
         // Device dropdown
         var devices = MainWindow.Config.Devices;
         CmbDevice.ItemsSource = null;
         CmbDevice.ItemsSource = devices;
+        var selIp = MainWindow.Config.State.SelectedDeviceIp;
+        CmbDevice.SelectedItem = devices.FirstOrDefault(d => d.Ip == selIp)
+                               ?? devices.FirstOrDefault();
 
-        // Select the saved device, or default to first
-        var selectedIp = MainWindow.Config.State.SelectedDeviceIp;
-        var selected = devices.FirstOrDefault(d => d.Ip == selectedIp)
-                    ?? devices.FirstOrDefault();
-        CmbDevice.SelectedItem = selected;
-
-        // Reload steps from config
+        // Reload steps
         _steps.Clear();
         foreach (var s in MainWindow.Config.State.BuilderSteps)
             _steps.Add(s);
-
-        // Populate payload combo with payload names
-        CmbPayloadStep.ItemsSource = null;
-        CmbPayloadStep.ItemsSource = MainWindow.Config.PayloadMeta.Keys.ToList();
-        if (CmbPayloadStep.Items.Count > 0)
-            CmbPayloadStep.SelectedIndex = 0;
 
         UpdateEmptyHint();
         _loading = false;
     }
 
-    private void UpdateEmptyHint()
-    {
-        TxtFlowEmpty.Visibility = _steps.Count == 0
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-    }
+    private void UpdateEmptyHint() =>
+        TxtFlowEmpty.Visibility = _steps.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
     private string GetSelectedHost()
     {
-        if (CmbDevice.SelectedItem is DeviceConfig dev)
-            return dev.Ip;
+        if (CmbDevice.SelectedItem is DeviceConfig dev) return dev.Ip;
         return MainWindow.Config.PS5Host;
     }
 
@@ -103,9 +95,7 @@ public partial class FlowBuilderPage : UserControl
         var elfTask = PortChecker.CheckPortAsync(host, 9021, 2_000);
         await Task.WhenAll(luaTask, elfTask);
 
-        bool luaOpen = luaTask.Result;
-        bool elfOpen = elfTask.Result;
-
+        bool luaOpen = luaTask.Result, elfOpen = elfTask.Result;
         EllipseLua.Fill = luaOpen ? _dotOn : _dotOff;
         EllipseElf.Fill = elfOpen ? _dotOn : _dotOff;
 
@@ -115,47 +105,43 @@ public partial class FlowBuilderPage : UserControl
         AppendLog($"Lua 9026: {(luaOpen ? "OPEN" : "closed")}   ELF 9021: {(elfOpen ? "OPEN" : "closed")}");
     }
 
-    // ── Add steps ────────────────────────────────────────────────────────────
+    // ── Instant add step buttons ──────────────────────────────────────────────
 
-    private void BtnAddPayloadStep_Click(object sender, RoutedEventArgs e)
+    private void BtnAddPayload_Click(object sender, RoutedEventArgs e)
     {
-        var name = CmbPayloadStep.SelectedItem?.ToString()?.Trim() ?? "";
-        if (string.IsNullOrEmpty(name))
+        var first = PayloadNames.FirstOrDefault() ?? "";
+        var port  = string.IsNullOrEmpty(first) ? 9021 : PayloadSender.GetDefaultPort(first);
+        _steps.Add(new BuilderStep { Type = "payload", Payload = first, Port = port });
+        SyncFlowToConfig();
+    }
+
+    private void BtnAddWait_Click(object sender, RoutedEventArgs e)
+    {
+        _steps.Add(new BuilderStep { Type = "wait_port", Port = 9021, Timeout = 60 });
+        SyncFlowToConfig();
+    }
+
+    private void BtnAddDelay_Click(object sender, RoutedEventArgs e)
+    {
+        _steps.Add(new BuilderStep { Type = "delay", Ms = 1000 });
+        SyncFlowToConfig();
+    }
+
+    // ── Inline step editing ───────────────────────────────────────────────────
+
+    private void CmbStepPayload_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ComboBox cb) return;
+        // The TwoWay binding already wrote to step.Payload — just update Port
+        if (cb.DataContext is BuilderStep step && cb.SelectedItem is string name)
         {
-            AppendLog("Select a payload first.");
-            return;
+            step.Port = PayloadSender.GetDefaultPort(name);
+            SyncFlowToConfig();
         }
-
-        if (!int.TryParse(TxtPayloadPort.Text.Trim(), out int port))
-            port = PayloadSender.GetDefaultPort(name);
-        if (port == 0) port = 9021;
-
-        _steps.Add(new BuilderStep { Type = "payload", Payload = name, Port = port });
-        SyncFlowToConfig();
     }
 
-    private void BtnAddWaitStep_Click(object sender, RoutedEventArgs e)
-    {
-        if (!int.TryParse(TxtWaitPort.Text.Trim(), out int port))
-            port = 9026;
-        if (!int.TryParse(TxtWaitTimeout.Text.Trim(), out int timeout))
-            timeout = 60;
-        if (port == 0) port = 9026;
-        if (timeout == 0) timeout = 60;
-
-        _steps.Add(new BuilderStep { Type = "wait_port", Port = port, Timeout = timeout });
+    private void StepField_LostFocus(object sender, RoutedEventArgs e) =>
         SyncFlowToConfig();
-    }
-
-    private void BtnAddDelayStep_Click(object sender, RoutedEventArgs e)
-    {
-        if (!int.TryParse(TxtDelayMs.Text.Trim(), out int ms))
-            ms = 500;
-        if (ms == 0) ms = 500;
-
-        _steps.Add(new BuilderStep { Type = "delay", Ms = ms });
-        SyncFlowToConfig();
-    }
 
     // ── Reorder / Remove ─────────────────────────────────────────────────────
 
@@ -163,18 +149,14 @@ public partial class FlowBuilderPage : UserControl
     {
         if (sender is not Button btn || btn.Tag is not BuilderStep step) return;
         int idx = _steps.IndexOf(step);
-        if (idx <= 0) return;
-        _steps.Move(idx, idx - 1);
-        SyncFlowToConfig();
+        if (idx > 0) { _steps.Move(idx, idx - 1); SyncFlowToConfig(); }
     }
 
     private void BtnMoveDown_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button btn || btn.Tag is not BuilderStep step) return;
         int idx = _steps.IndexOf(step);
-        if (idx < 0 || idx >= _steps.Count - 1) return;
-        _steps.Move(idx, idx + 1);
-        SyncFlowToConfig();
+        if (idx >= 0 && idx < _steps.Count - 1) { _steps.Move(idx, idx + 1); SyncFlowToConfig(); }
     }
 
     private void BtnRemoveStep_Click(object sender, RoutedEventArgs e)
@@ -188,46 +170,33 @@ public partial class FlowBuilderPage : UserControl
 
     private void BtnSaveProfile_Click(object sender, RoutedEventArgs e)
     {
-        if (_steps.Count == 0)
-        {
-            AppendLog("Flow is empty — nothing to save.");
-            return;
-        }
-
-        var name = $"flow_{DateTime.Now:yyyyMMdd_HHmm}.txt";
-        var lines = _steps.Select(s => s.ToProfileLine()).Where(l => !string.IsNullOrEmpty(l));
-        var content = string.Join("\n", lines);
-        var path = Path.Combine(AppPaths.ProfilesDir, name);
-        File.WriteAllText(path, content);
+        if (_steps.Count == 0) { AppendLog("Flow is empty — nothing to save."); return; }
+        var name = string.IsNullOrWhiteSpace(TxtFlowName.Text)
+            ? $"flow_{DateTime.Now:yyyyMMdd_HHmm}.txt"
+            : $"{TxtFlowName.Text.Trim()}.txt";
+        var content = string.Join("\n", _steps.Select(s => s.ToProfileLine()).Where(l => l.Length > 0));
+        Directory.CreateDirectory(AppPaths.ProfilesDir);
+        File.WriteAllText(Path.Combine(AppPaths.ProfilesDir, name), content);
         MainWindow.Config.Profiles[name] = content;
         MainWindow.SaveConfig();
-        AppendLog($"Saved profile: {name}");
+        AppendLog($"Saved: {name}");
     }
 
     // ── Run / Stop ───────────────────────────────────────────────────────────
 
     private async void BtnRunFlow_Click(object sender, RoutedEventArgs e)
     {
-        if (_steps.Count == 0)
-        {
-            AppendLog("Flow is empty — nothing to run.");
-            return;
-        }
+        if (_steps.Count == 0) { AppendLog("Flow is empty — nothing to run."); return; }
 
-        var host = GetSelectedHost();
-        MainWindow.Config.PS5Host = host;
-
-        var directives = _steps.Select(s => s.ToProfileLine())
-            .Where(l => !string.IsNullOrEmpty(l))
-            .ToList();
-
-        var content = string.Join("\n", directives);
+        var host    = GetSelectedHost();
+        var content = string.Join("\n", _steps.Select(s => s.ToProfileLine()).Where(l => l.Length > 0));
         var parsed  = ProfileParser.Parse(content, AppPaths.PayloadsDir);
 
         BtnRun.IsEnabled  = false;
         BtnStop.IsEnabled = true;
         PrgFlow.Value     = 0;
 
+        MainWindow.Config.PS5Host = host;
         await _engine.RunAsync(host, parsed);
 
         BtnRun.IsEnabled  = true;
@@ -248,28 +217,20 @@ public partial class FlowBuilderPage : UserControl
         Dispatcher.Invoke(() =>
         {
             AppendLog(e.Message);
-
             if (e.TotalSteps > 0 && e.StepIndex >= 0)
                 PrgFlow.Value = (double)e.StepIndex / e.TotalSteps * 100.0;
-
-            if (e.State is ExecState.Completed)
-                PrgFlow.Value = 100;
-
+            if (e.State is ExecState.Completed) PrgFlow.Value = 100;
             if (e.State is ExecState.Completed or ExecState.Failed or ExecState.Stopped)
-            {
-                BtnRun.IsEnabled  = true;
-                BtnStop.IsEnabled = false;
-            }
+            { BtnRun.IsEnabled = true; BtnStop.IsEnabled = false; }
         });
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private void AppendLog(string message)
+    private void AppendLog(string msg)
     {
         TxtFlowLog.Text = string.IsNullOrEmpty(TxtFlowLog.Text)
-            ? message
-            : TxtFlowLog.Text + "\n" + message;
+            ? msg : TxtFlowLog.Text + "\n" + msg;
         LogScroll.ScrollToBottom();
     }
 
