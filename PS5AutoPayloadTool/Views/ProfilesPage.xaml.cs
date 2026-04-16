@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -144,18 +143,52 @@ public partial class ProfilesPage : UserControl
     {
         if (sender is not Button btn || btn.Tag is not string fullPath) return;
 
+        if (!File.Exists(fullPath))
+        {
+            Log($"File not found: {fullPath}", _clrRed);
+            return;
+        }
+
+        List<IDirective> directives;
         try
         {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName        = fullPath,
-                UseShellExecute = true
-            });
+            directives = ProfileParser.ParseFile(fullPath, AppPaths.PayloadsDir);
         }
         catch (Exception ex)
         {
-            Log($"Cannot open editor: {ex.Message}", _clrRed);
+            Log($"Parse error: {ex.Message}", _clrRed);
+            return;
         }
+
+        // Convert directives back to BuilderStep list
+        var steps = directives.Select(d => d switch
+        {
+            SendDirective send => new Models.BuilderStep
+            {
+                Type    = "payload",
+                Payload = Path.GetFileName(send.FilePath),
+                Port    = send.Port
+            },
+            DelayDirective delay => new Models.BuilderStep
+            {
+                Type = "delay",
+                Ms   = delay.DelayMs
+            },
+            WaitPortDirective wait => new Models.BuilderStep
+            {
+                Type    = "wait_port",
+                Port    = wait.Port,
+                Timeout = wait.TimeoutSeconds
+            },
+            _ => null
+        }).Where(s => s != null).Cast<Models.BuilderStep>().ToList();
+
+        var profileName = Path.GetFileNameWithoutExtension(fullPath);
+
+        if (Window.GetWindow(this) is MainWindow mw)
+            mw.OpenInBuilder(steps, profileName);
+        else
+            Log("Cannot navigate to Autoload Builder.", _clrRed);
     }
 
     // ── Delete ───────────────────────────────────────────────────────────────

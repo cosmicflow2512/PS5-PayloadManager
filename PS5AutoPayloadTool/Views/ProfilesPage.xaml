@@ -89,7 +89,7 @@
                                    Foreground="{StaticResource FgSubtle}"
                                    HorizontalAlignment="Center"
                                    FontSize="14"/>
-                        <TextBlock Text="Import a .txt profile or save a flow from the Flow Builder page."
+                        <TextBlock Text="Import a .txt profile or save a flow from the Autoload Builder page."
                                    Foreground="{StaticResource FgSubtle}"
                                    HorizontalAlignment="Center"
                                    FontSize="12" Margin="0,6,0,0"

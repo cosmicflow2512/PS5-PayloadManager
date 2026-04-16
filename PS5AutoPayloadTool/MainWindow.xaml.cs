@@ -110,6 +110,16 @@ public partial class MainWindow : Window
         SidebarHost.Text = host;
     }
 
+    /// <summary>
+    /// Navigate to the Autoload Builder and pre-load a set of steps.
+    /// Called from ProfilesPage when the user clicks Edit on a profile.
+    /// </summary>
+    public void OpenInBuilder(List<Models.BuilderStep> steps, string? profileName = null)
+    {
+        NavFlow.IsChecked = true;   // triggers NavFlow_Checked → sets ContentArea
+        _flowBuilderPage.LoadSteps(steps, profileName);
+    }
+
     /// <summary>Update the sidebar port indicator dots.</summary>
     public void SetPortIndicators(bool luaOpen, bool elfOpen)
     {

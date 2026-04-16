@@ -22,69 +22,107 @@
                         Click="BtnToggleAdd_Click"/>
             </Grid>
 
-            <!-- ── Add / Edit Source Form ───────────────────────────────── -->
-            <Border x:Name="AddForm"
+            <!-- ═══ STEP 1: URL + Scan ═══════════════════════════════════ -->
+            <Border x:Name="ScanPanel"
                     Visibility="Collapsed"
                     Style="{StaticResource Card}"
-                    Margin="0,0,0,16">
+                    Margin="0,0,0,10">
                 <StackPanel>
                     <TextBlock x:Name="FormTitle"
                                Text="Add New Source"
                                Style="{StaticResource SectionTitle}"/>
 
-                    <!-- Single URL input -->
-                    <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="Repository  (https://github.com/owner/repo  or  owner/repo)"
-                                   Foreground="{StaticResource FgSubtle}"
-                                   FontSize="11" Margin="0,0,0,4"/>
-                        <TextBox x:Name="TxtRepoUrl"
-                                 FontFamily="Consolas"/>
-                    </StackPanel>
+                    <TextBlock Text="Repository  (owner/repo  or  https://github.com/owner/repo)"
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="11" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtRepoUrl" FontFamily="Consolas" Margin="0,0,0,12"/>
 
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Source Type"
-                                       Foreground="{StaticResource FgSubtle}"
-                                       FontSize="11" Margin="0,0,0,4"/>
-                            <ComboBox x:Name="CmbType"
-                                      SelectionChanged="CmbType_SelectionChanged">
-                                <ComboBoxItem Content="GitHub Releases" IsSelected="True"/>
-                                <ComboBoxItem Content="GitHub Folder"/>
-                            </ComboBox>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="File filter  (e.g. *.elf)"
-                                       Foreground="{StaticResource FgSubtle}"
-                                       FontSize="11" Margin="0,0,0,4"/>
-                            <TextBox x:Name="TxtFilter"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <StackPanel x:Name="FolderPathPanel"
-                                Visibility="Collapsed"
-                                Margin="0,0,0,10">
-                        <TextBlock Text="Folder path within repository"
-                                   Foreground="{StaticResource FgSubtle}"
-                                   FontSize="11" Margin="0,0,0,4"/>
-                        <TextBox x:Name="TxtFolder"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                        <Button x:Name="BtnScanAdd"
-                                Content="Scan &amp; Save"
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="BtnScanRepo"
+                                Content="Scan Repository"
                                 Style="{StaticResource BtnAccent}"
                                 Margin="0,0,8,0"
-                                Click="BtnScanAdd_Click"/>
+                                Click="BtnScanRepo_Click"/>
                         <Button Content="Cancel"
                                 Style="{StaticResource Btn}"
                                 Click="BtnCancelAdd_Click"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ═══ STEP 2: Select mode + folder ═════════════════════════ -->
+            <Border x:Name="SelectPanel"
+                    Visibility="Collapsed"
+                    Style="{StaticResource Card}"
+                    Margin="0,0,0,10">
+                <StackPanel>
+                    <TextBlock x:Name="ScanResultTitle"
+                               Text="Scan Results"
+                               Style="{StaticResource SectionTitle}"/>
+
+                    <!-- Mode selection -->
+                    <TextBlock Text="Source mode"
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="11" Margin="0,0,0,6"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <RadioButton x:Name="RbReleases"
+                                     Content="GitHub Releases"
+                                     Foreground="{StaticResource FgMain}"
+                                     Margin="0,0,20,0"
+                                     Checked="RbMode_Checked"/>
+                        <RadioButton x:Name="RbFolder"
+                                     Content="GitHub Folder"
+                                     Foreground="{StaticResource FgMain}"
+                                     Checked="RbMode_Checked"/>
+                    </StackPanel>
+
+                    <!-- Releases info (shown when Releases selected) -->
+                    <TextBlock x:Name="TxtReleasesInfo"
+                               Foreground="{StaticResource Green}"
+                               FontSize="11" Margin="0,0,0,10"
+                               Visibility="Collapsed"/>
+
+                    <!-- No releases warning -->
+                    <TextBlock x:Name="TxtNoReleasesWarn"
+                               Text="No payload releases found in this repository."
+                               Foreground="{StaticResource Yellow}"
+                               FontSize="11" Margin="0,0,0,10"
+                               Visibility="Collapsed"/>
+
+                    <!-- Folder selection (shown when Folder selected) -->
+                    <StackPanel x:Name="FolderSelectPanel" Visibility="Collapsed">
+                        <TextBlock Text="Folder"
+                                   Foreground="{StaticResource FgSubtle}"
+                                   FontSize="11" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="CmbFolder"
+                                  SelectionChanged="CmbFolder_SelectionChanged"
+                                  Margin="0,0,0,8"/>
+                        <StackPanel x:Name="CustomFolderPanel" Visibility="Collapsed">
+                            <TextBlock Text="Custom folder path"
+                                       Foreground="{StaticResource FgSubtle}"
+                                       FontSize="11" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtCustomFolder"
+                                     FontFamily="Consolas"
+                                     Margin="0,0,0,8"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Filter (always shown) -->
+                    <TextBlock Text="File filter  (optional, e.g. *.elf)"
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="11" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtFilter" Margin="0,0,0,12"/>
+
+                    <!-- Actions -->
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="BtnSaveSource"
+                                Content="Save Source"
+                                Style="{StaticResource BtnAccent}"
+                                Margin="0,0,8,0"
+                                Click="BtnSaveSource_Click"/>
+                        <Button Content="Back"
+                                Style="{StaticResource Btn}"
+                                Click="BtnBackToScan_Click"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -110,13 +148,13 @@
                                                Foreground="{StaticResource FgMain}"
                                                FontSize="13"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                        <TextBlock Text="{Binding Type}"
+                                        <TextBlock Text="{Binding TypeLabel}"
                                                    Foreground="{StaticResource FgSubtle}"
                                                    FontSize="11"/>
                                         <TextBlock Text=" · "
                                                    Foreground="{StaticResource FgSubtle}"
                                                    FontSize="11"/>
-                                        <TextBlock Text="{Binding Filter}"
+                                        <TextBlock Text="{Binding FolderOrReleases}"
                                                    Foreground="{StaticResource FgSubtle}"
                                                    FontSize="11"/>
                                     </StackPanel>

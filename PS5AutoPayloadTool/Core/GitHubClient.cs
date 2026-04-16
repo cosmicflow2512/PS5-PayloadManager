@@ -127,4 +127,26 @@ public class GitHubClient
         var ext = System.IO.Path.GetExtension(name).ToLowerInvariant();
         return ext is ".lua" or ".elf" or ".bin";
     }
+
+    /// <summary>Returns top-level directory names in the repository root.</summary>
+    public async Task<List<string>> GetRepoDirsAsync(string owner, string repo)
+    {
+        try
+        {
+            var contents = await GetFolderContentsAsync(owner, repo, "");
+            return contents.Where(c => c.Type == "dir").Select(c => c.Name).ToList();
+        }
+        catch { return new(); }
+    }
+
+    /// <summary>Returns true if the repo has at least one release with a payload asset.</summary>
+    public async Task<bool> HasReleasesAsync(string owner, string repo)
+    {
+        try
+        {
+            var releases = await GetReleasesAsync(owner, repo);
+            return releases.Any(r => r.Assets.Any(a => IsPayloadFile(a.Name)));
+        }
+        catch { return false; }
+    }
 }

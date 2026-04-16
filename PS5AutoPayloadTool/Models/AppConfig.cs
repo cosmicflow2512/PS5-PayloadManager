@@ -126,10 +126,16 @@ public class SourceConfig
         }
     }
 
-    // Keep an Id property so the existing SourcesPage XAML (Tag="{Binding Id}") still compiles.
-    // We derive it from the URL so it's stable.
     [JsonIgnore]
     public string Id => Url;
+
+    [JsonIgnore]
+    public string TypeLabel => Type == "release" ? "Releases" : "Folder";
+
+    [JsonIgnore]
+    public string FolderOrReleases =>
+        Type == "release" ? "release assets" :
+        string.IsNullOrEmpty(FolderPath) ? "root" : FolderPath;
 }
 
 public class PayloadMeta

@@ -18,11 +18,9 @@
                       HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="24,20,24,10">
 
-                <!-- ── Header: flow name + device ────────────────────── -->
+                <!-- ── Header: title + device ─────────────────────────── -->
                 <Grid Margin="0,0,0,14">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="180"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
@@ -30,19 +28,12 @@
                     </Grid.ColumnDefinitions>
 
                     <TextBlock Grid.Column="0"
-                               Text="Flow Builder"
+                               Text="Autoload Builder"
                                Style="{StaticResource PageTitle}"
                                VerticalAlignment="Center"
-                               Margin="0,0,12,0"/>
+                               Margin="0"/>
 
-                    <TextBox Grid.Column="1"
-                             x:Name="TxtFlowName"
-                             FontSize="13" FontWeight="SemiBold"
-                             VerticalAlignment="Center"
-                             TextChanged="TxtFlowName_TextChanged"/>
-
-                    <!-- spacer -->
-                    <StackPanel Grid.Column="3"
+                    <StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center"
                                 Margin="0,0,10,0">
@@ -63,7 +54,7 @@
                                    FontSize="11" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <ComboBox Grid.Column="4"
+                    <ComboBox Grid.Column="2"
                               x:Name="CmbDevice"
                               Width="200"
                               VerticalAlignment="Center"
@@ -76,7 +67,7 @@
                         </ComboBox.ItemTemplate>
                     </ComboBox>
 
-                    <Button Grid.Column="5"
+                    <Button Grid.Column="3"
                             Content="Check Ports"
                             Style="{StaticResource Btn}"
                             VerticalAlignment="Center"
@@ -136,73 +127,73 @@
                                                            FontSize="10" FontWeight="SemiBold"/>
                                             </Border>
 
-                                            <!-- ── PAYLOAD inline content ── -->
+                                            <!-- ── PAYLOAD ── -->
                                             <StackPanel x:Name="PayloadPanel"
                                                         Grid.Column="1"
                                                         Orientation="Horizontal"
                                                         VerticalAlignment="Center"
-                                                        Margin="6,0"
+                                                        Margin="8,0"
                                                         Visibility="Collapsed">
-                                                <ComboBox x:Name="CmbStepPayload"
-                                                          ItemsSource="{Binding DataContext.PayloadNames,
+                                                <ComboBox ItemsSource="{Binding DataContext.PayloadNames,
                                                               RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                           SelectedItem="{Binding Payload, Mode=TwoWay}"
-                                                          Width="180" FontSize="12"
+                                                          Width="190" FontSize="12"
                                                           SelectionChanged="CmbStepPayload_SelectionChanged"/>
                                                 <TextBlock Text=" → "
                                                            Foreground="{StaticResource FgSubtle}"
-                                                           VerticalAlignment="Center"
-                                                           FontSize="12"/>
+                                                           VerticalAlignment="Center" FontSize="12"/>
                                                 <TextBox Text="{Binding Port, Mode=TwoWay,
                                                              UpdateSourceTrigger=LostFocus}"
-                                                         Width="55" FontFamily="Consolas"
+                                                         Width="68" MinWidth="68"
+                                                         FontFamily="Consolas"
                                                          LostFocus="StepField_LostFocus"/>
                                             </StackPanel>
 
-                                            <!-- ── WAIT inline content ── -->
+                                            <!-- ── WAIT ── -->
                                             <StackPanel x:Name="WaitPanel"
                                                         Grid.Column="1"
                                                         Orientation="Horizontal"
                                                         VerticalAlignment="Center"
-                                                        Margin="6,0"
+                                                        Margin="8,0"
                                                         Visibility="Collapsed">
                                                 <TextBlock Text="Port:"
                                                            Foreground="{StaticResource FgSubtle}"
                                                            VerticalAlignment="Center"
-                                                           FontSize="12" Margin="0,0,5,0"/>
+                                                           FontSize="12" Margin="0,0,6,0"/>
                                                 <TextBox Text="{Binding Port, Mode=TwoWay,
                                                              UpdateSourceTrigger=LostFocus}"
-                                                         Width="55" FontFamily="Consolas"
+                                                         Width="68" MinWidth="68"
+                                                         FontFamily="Consolas"
                                                          LostFocus="StepField_LostFocus"/>
                                                 <TextBlock Text="  Timeout:"
                                                            Foreground="{StaticResource FgSubtle}"
                                                            VerticalAlignment="Center"
-                                                           FontSize="12" Margin="8,0,5,0"/>
+                                                           FontSize="12" Margin="10,0,6,0"/>
                                                 <TextBox Text="{Binding Timeout, Mode=TwoWay,
                                                              UpdateSourceTrigger=LostFocus}"
-                                                         Width="45" FontFamily="Consolas"
+                                                         Width="58" MinWidth="58"
+                                                         FontFamily="Consolas"
                                                          LostFocus="StepField_LostFocus"/>
                                                 <TextBlock Text=" s"
                                                            Foreground="{StaticResource FgSubtle}"
-                                                           VerticalAlignment="Center"
-                                                           FontSize="12"/>
+                                                           VerticalAlignment="Center" FontSize="12"/>
                                             </StackPanel>
 
-                                            <!-- ── DELAY inline content ── -->
+                                            <!-- ── DELAY ── -->
                                             <StackPanel x:Name="DelayPanel"
                                                         Grid.Column="1"
                                                         Orientation="Horizontal"
                                                         VerticalAlignment="Center"
-                                                        Margin="6,0"
+                                                        Margin="8,0"
                                                         Visibility="Collapsed">
                                                 <TextBox Text="{Binding Ms, Mode=TwoWay,
                                                              UpdateSourceTrigger=LostFocus}"
-                                                         Width="70" FontFamily="Consolas"
+                                                         Width="80" MinWidth="80"
+                                                         FontFamily="Consolas"
                                                          LostFocus="StepField_LostFocus"/>
                                                 <TextBlock Text=" ms"
                                                            Foreground="{StaticResource FgSubtle}"
-                                                           VerticalAlignment="Center"
-                                                           FontSize="12"/>
+                                                           VerticalAlignment="Center" FontSize="12"/>
                                             </StackPanel>
 
                                             <!-- Action buttons -->
@@ -258,13 +249,19 @@
                 BorderThickness="0,1,0,0"
                 Padding="24,12">
             <StackPanel>
+
+                <!-- Main actions -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                     <Button Content="Save as Profile"
                             Style="{StaticResource Btn}"
                             Margin="0,0,8,0"
                             Click="BtnSaveProfile_Click"/>
+                    <Button Content="Export Autoload ZIP"
+                            Style="{StaticResource BtnYellow}"
+                            Margin="0,0,8,0"
+                            Click="BtnExportZip_Click"/>
                     <Button x:Name="BtnRun"
-                            Content="&#x25B6;  Run Flow"
+                            Content="&#x25B6;  Run"
                             Style="{StaticResource BtnGreen}"
                             Margin="0,0,8,0"
                             Click="BtnRunFlow_Click"/>
@@ -274,6 +271,45 @@
                             IsEnabled="False"
                             Click="BtnStopFlow_Click"/>
                 </StackPanel>
+
+                <!-- Save name panel (hidden until "Save as Profile" clicked) -->
+                <Border x:Name="SaveNamePanel"
+                        Visibility="Collapsed"
+                        Background="{StaticResource BgBase}"
+                        BorderBrush="{StaticResource BgSurface}"
+                        BorderThickness="1" CornerRadius="4"
+                        Padding="10,8" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="Enter a name for this profile:"
+                                   Foreground="{StaticResource FgSubtle}"
+                                   FontSize="11" Margin="0,0,0,6"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="TxtSaveName"
+                                     Grid.Column="0"
+                                     FontSize="12"
+                                     Margin="0,0,8,0"/>
+                            <Button Grid.Column="1"
+                                    Content="Save"
+                                    Style="{StaticResource BtnAccent}"
+                                    Padding="14,5" Margin="0,0,6,0"
+                                    Click="BtnConfirmSave_Click"/>
+                            <Button Grid.Column="2"
+                                    Content="Cancel"
+                                    Style="{StaticResource Btn}"
+                                    Padding="10,5"
+                                    Click="BtnCancelSave_Click"/>
+                        </Grid>
+                        <TextBlock x:Name="TxtSaveError"
+                                   Foreground="{StaticResource Red}"
+                                   FontSize="11" Margin="0,4,0,0"
+                                   Visibility="Collapsed"/>
+                    </StackPanel>
+                </Border>
 
                 <ProgressBar x:Name="PrgFlow"
                              Minimum="0" Maximum="100" Value="0"

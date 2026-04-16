@@ -11,6 +11,12 @@ public partial class SourcesPage : UserControl
 {
     private readonly ObservableCollection<SourceConfig> _sources = new();
     private string? _editingId;
+    private string? _scannedUrl;
+    private bool _hasReleases;
+
+    // Well-known folders to look for during scan
+    private static readonly string[] KnownPayloadFolders =
+        { "payloads", "bin", "elf", "release", "releases", "output", "dist" };
 
     public SourcesPage()
     {
@@ -42,42 +48,48 @@ public partial class SourcesPage : UserControl
         return null;
     }
 
+    // ── Form navigation ──────────────────────────────────────────────────────
+
     private void BtnToggleAdd_Click(object sender, RoutedEventArgs e)
     {
-        if (AddForm.Visibility == Visibility.Visible) CloseForm();
-        else OpenForm(null);
+        if (ScanPanel.Visibility == Visibility.Visible
+         || SelectPanel.Visibility == Visibility.Visible)
+            CloseForm();
+        else
+            OpenScanPanel(null);
     }
 
-    private void OpenForm(SourceConfig? existing)
+    private void OpenScanPanel(SourceConfig? existing)
     {
-        _editingId = existing?.Id;
+        _editingId   = existing?.Id;
+        _scannedUrl  = null;
         FormTitle.Text = existing == null ? "Add New Source" : "Edit Source";
-        BtnScanAdd.Content = existing == null ? "Scan & Save" : "Rescan & Save";
         TxtRepoUrl.Text = existing?.Url ?? "";
-        TxtFilter.Text  = existing?.Filter ?? "";
-        TxtFolder.Text  = existing?.FolderPath ?? "";
-        CmbType.SelectedIndex = existing?.Type == "folder" ? 1 : 0;
-        FolderPathPanel.Visibility = CmbType.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
-        AddForm.Visibility = Visibility.Visible;
+
+        ScanPanel.Visibility   = Visibility.Visible;
+        SelectPanel.Visibility = Visibility.Collapsed;
         TxtStatus.Text = "";
     }
 
     private void CloseForm()
     {
-        _editingId = null;
-        AddForm.Visibility = Visibility.Collapsed;
+        _editingId  = null;
+        _scannedUrl = null;
+        ScanPanel.Visibility   = Visibility.Collapsed;
+        SelectPanel.Visibility = Visibility.Collapsed;
         TxtStatus.Text = "";
     }
 
     private void BtnCancelAdd_Click(object sender, RoutedEventArgs e) => CloseForm();
-
-    private void CmbType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void BtnBackToScan_Click(object sender, RoutedEventArgs e)
     {
-        if (FolderPathPanel == null) return;
-        FolderPathPanel.Visibility = CmbType.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
+        SelectPanel.Visibility = Visibility.Collapsed;
+        ScanPanel.Visibility   = Visibility.Visible;
     }
 
-    private async void BtnScanAdd_Click(object sender, RoutedEventArgs e)
+    // ── Step 1: Scan ─────────────────────────────────────────────────────────
+
+    private async void BtnScanRepo_Click(object sender, RoutedEventArgs e)
     {
         var url = ParseRepoUrl(TxtRepoUrl.Text);
         if (url == null)
@@ -86,22 +98,149 @@ public partial class SourcesPage : UserControl
             return;
         }
 
-        var source = new SourceConfig
-        {
-            Url        = url,
-            Type       = CmbType.SelectedIndex == 1 ? "folder" : "release",
-            Filter     = TxtFilter.Text.Trim(),
-            FolderPath = TxtFolder.Text.Trim()
-        };
-
-        TxtStatus.Text = $"Scanning {source.DisplayName}...";
-        BtnScanAdd.IsEnabled = false;
-        var progress = new Progress<string>(msg => Dispatcher.Invoke(() => TxtStatus.Text = msg));
+        _scannedUrl = url;
+        var tmp = new SourceConfig { Url = url };
+        TxtStatus.Text = $"Scanning {tmp.DisplayName}…";
+        BtnScanRepo.IsEnabled = false;
 
         try
         {
-            var found = await MainWindow.PayloadMgr.ScanSourceAsync(source, progress, CancellationToken.None);
+            // Parallel: get root dirs + check releases
+            var dirsTask     = MainWindow.GitHub.GetRepoDirsAsync(tmp.Owner, tmp.Repo);
+            var releasesTask = MainWindow.GitHub.HasReleasesAsync(tmp.Owner, tmp.Repo);
+            await Task.WhenAll(dirsTask, releasesTask);
 
+            var dirs = dirsTask.Result;
+            _hasReleases = releasesTask.Result;
+
+            // Populate folder combo
+            var folderItems = new List<string> { "/ (root)" };
+            // Prioritise known payload folders
+            foreach (var kf in KnownPayloadFolders)
+                if (dirs.Any(d => d.Equals(kf, StringComparison.OrdinalIgnoreCase)))
+                    folderItems.Add(dirs.First(d => d.Equals(kf, StringComparison.OrdinalIgnoreCase)));
+            // Then any remaining dirs
+            foreach (var d in dirs)
+                if (!folderItems.Contains(d))
+                    folderItems.Add(d);
+            folderItems.Add("Custom…");
+
+            CmbFolder.ItemsSource   = folderItems;
+            CmbFolder.SelectedIndex = 0;
+
+            // Release info
+            TxtReleasesInfo.Text = _hasReleases
+                ? "Payload releases found in this repository."
+                : "";
+            TxtReleasesInfo.Visibility    = _hasReleases ? Visibility.Visible : Visibility.Collapsed;
+            TxtNoReleasesWarn.Visibility  = _hasReleases ? Visibility.Collapsed : Visibility.Visible;
+
+            // Pre-select mode
+            if (_hasReleases)
+            {
+                RbReleases.IsChecked = true;
+            }
+            else
+            {
+                RbFolder.IsChecked = true;
+            }
+
+            // Pre-fill if editing
+            if (_editingId != null)
+            {
+                var existing = MainWindow.Config.Sources.FirstOrDefault(s => s.Id == _editingId);
+                if (existing != null)
+                {
+                    TxtFilter.Text = existing.Filter;
+                    if (existing.Type == "release")
+                    {
+                        RbReleases.IsChecked = true;
+                    }
+                    else
+                    {
+                        RbFolder.IsChecked = true;
+                        var fp = existing.FolderPath;
+                        if (string.IsNullOrEmpty(fp))
+                            CmbFolder.SelectedItem = "/ (root)";
+                        else if (folderItems.Contains(fp))
+                            CmbFolder.SelectedItem = fp;
+                        else
+                        {
+                            CmbFolder.SelectedItem = "Custom…";
+                            TxtCustomFolder.Text   = fp;
+                        }
+                    }
+                }
+            }
+
+            ScanResultTitle.Text = $"Results for {tmp.DisplayName}";
+            ScanPanel.Visibility   = Visibility.Collapsed;
+            SelectPanel.Visibility = Visibility.Visible;
+            TxtStatus.Text = $"Scan complete. {dirs.Count} folder(s) found.";
+        }
+        catch (Exception ex)
+        {
+            TxtStatus.Text = $"Scan error: {ex.Message}";
+        }
+        finally
+        {
+            BtnScanRepo.IsEnabled = true;
+        }
+    }
+
+    // ── Mode radio toggle ────────────────────────────────────────────────────
+
+    private void RbMode_Checked(object sender, RoutedEventArgs e)
+    {
+        if (FolderSelectPanel == null) return;
+        bool isFolder = RbFolder?.IsChecked == true;
+        FolderSelectPanel.Visibility = isFolder ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void CmbFolder_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (CustomFolderPanel == null) return;
+        CustomFolderPanel.Visibility =
+            CmbFolder.SelectedItem?.ToString() == "Custom…"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+    }
+
+    // ── Step 2: Save ─────────────────────────────────────────────────────────
+
+    private async void BtnSaveSource_Click(object sender, RoutedEventArgs e)
+    {
+        if (_scannedUrl == null) return;
+
+        bool useReleases = RbReleases?.IsChecked == true;
+        string folderPath = "";
+
+        if (!useReleases)
+        {
+            var sel = CmbFolder.SelectedItem?.ToString() ?? "/ (root)";
+            if (sel == "Custom…")
+                folderPath = TxtCustomFolder.Text.Trim().TrimStart('/');
+            else if (sel != "/ (root)")
+                folderPath = sel;
+        }
+
+        var source = new SourceConfig
+        {
+            Url        = _scannedUrl,
+            Type       = useReleases ? "release" : "folder",
+            Filter     = TxtFilter.Text.Trim(),
+            FolderPath = folderPath
+        };
+
+        TxtStatus.Text = $"Scanning {source.DisplayName}…";
+        BtnSaveSource.IsEnabled = false;
+
+        try
+        {
+            var progress = new Progress<string>(msg => Dispatcher.Invoke(() => TxtStatus.Text = msg));
+            var found    = await MainWindow.PayloadMgr.ScanSourceAsync(source, progress, CancellationToken.None);
+
+            // Replace if editing
             if (_editingId != null)
                 MainWindow.Config.Sources.RemoveAll(s => s.Id == _editingId);
             if (!MainWindow.Config.Sources.Any(s => s.Url == source.Url))
@@ -119,11 +258,13 @@ public partial class SourcesPage : UserControl
             MainWindow.SaveConfig();
             PopulateList();
             CloseForm();
-            TxtStatus.Text = $"Found {found.Count} payload(s). Source saved.";
+            TxtStatus.Text = $"Saved. Found {found.Count} payload(s).";
         }
         catch (Exception ex) { TxtStatus.Text = $"Error: {ex.Message}"; }
-        finally { BtnScanAdd.IsEnabled = true; }
+        finally { BtnSaveSource.IsEnabled = true; }
     }
+
+    // ── Rescan / Edit / Remove ────────────────────────────────────────────────
 
     private async void BtnRescan_Click(object sender, RoutedEventArgs e)
     {
@@ -131,7 +272,7 @@ public partial class SourcesPage : UserControl
         var source = MainWindow.Config.Sources.FirstOrDefault(s => s.Id == id);
         if (source == null) return;
 
-        TxtStatus.Text = $"Rescanning {source.DisplayName}...";
+        TxtStatus.Text = $"Rescanning {source.DisplayName}…";
         var progress = new Progress<string>(msg => Dispatcher.Invoke(() => TxtStatus.Text = msg));
         try
         {
@@ -154,7 +295,7 @@ public partial class SourcesPage : UserControl
     {
         if (sender is not Button btn || btn.Tag is not string id) return;
         var source = MainWindow.Config.Sources.FirstOrDefault(s => s.Id == id);
-        if (source != null) OpenForm(source);
+        if (source != null) OpenScanPanel(source);
     }
 
     private void BtnRemoveSource_Click(object sender, RoutedEventArgs e)

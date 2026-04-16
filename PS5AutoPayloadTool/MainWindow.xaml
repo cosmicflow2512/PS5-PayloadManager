@@ -84,7 +84,7 @@
                              Checked="NavPayloads_Checked"
                              Style="{StaticResource NavBtn}"/>
                 <RadioButton x:Name="NavFlow"
-                             Content="&#x25B6;  Flow Builder"
+                             Content="&#x25B6;  Autoload Builder"
                              GroupName="Nav"
                              Checked="NavFlow_Checked"
                              Style="{StaticResource NavBtn}"/>

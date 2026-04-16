@@ -1,8 +1,11 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.IO.Compression;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Microsoft.Win32;
 using PS5AutoPayloadTool.Core;
 using PS5AutoPayloadTool.Models;
 
@@ -26,19 +29,31 @@ public partial class FlowBuilderPage : UserControl
         InitializeComponent();
         FlowStepsList.ItemsSource = _steps;
         _steps.CollectionChanged += (_, _) => UpdateEmptyHint();
-        _engine.ProgressChanged += OnEngineProgress;
+        _engine.ProgressChanged  += OnEngineProgress;
     }
+
+    // ── Public: load steps from ProfilesPage edit ────────────────────────────
+
+    public void LoadSteps(List<BuilderStep> steps, string? profileName = null)
+    {
+        _loading = true;
+        _steps.Clear();
+        foreach (var s in steps) _steps.Add(s);
+        if (profileName != null)
+            TxtSaveName.Text = profileName;
+        UpdateEmptyHint();
+        _loading = false;
+        SyncFlowToConfig();
+    }
+
+    // ── Refresh ──────────────────────────────────────────────────────────────
 
     public void Refresh()
     {
         _loading = true;
 
-        TxtFlowName.Text = MainWindow.Config.State.BuilderProfileName;
-
-        // Payload names list for inline combos
         PayloadNames = MainWindow.Config.PayloadMeta.Keys.ToList();
 
-        // Device dropdown
         var devices = MainWindow.Config.Devices;
         CmbDevice.ItemsSource = null;
         CmbDevice.ItemsSource = devices;
@@ -46,7 +61,6 @@ public partial class FlowBuilderPage : UserControl
         CmbDevice.SelectedItem = devices.FirstOrDefault(d => d.Ip == selIp)
                                ?? devices.FirstOrDefault();
 
-        // Reload steps
         _steps.Clear();
         foreach (var s in MainWindow.Config.State.BuilderSteps)
             _steps.Add(s);
@@ -62,15 +76,6 @@ public partial class FlowBuilderPage : UserControl
     {
         if (CmbDevice.SelectedItem is DeviceConfig dev) return dev.Ip;
         return MainWindow.Config.PS5Host;
-    }
-
-    // ── Flow name ────────────────────────────────────────────────────────────
-
-    private void TxtFlowName_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_loading) return;
-        MainWindow.Config.State.BuilderProfileName = TxtFlowName.Text.Trim();
-        MainWindow.SaveConfig();
     }
 
     // ── Device selection ─────────────────────────────────────────────────────
@@ -90,7 +95,7 @@ public partial class FlowBuilderPage : UserControl
 
     private async void BtnCheckPorts_Click(object sender, RoutedEventArgs e)
     {
-        var host = GetSelectedHost();
+        var host    = GetSelectedHost();
         var luaTask = PortChecker.CheckPortAsync(host, 9026, 2_000);
         var elfTask = PortChecker.CheckPortAsync(host, 9021, 2_000);
         await Task.WhenAll(luaTask, elfTask);
@@ -132,7 +137,6 @@ public partial class FlowBuilderPage : UserControl
     private void CmbStepPayload_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (sender is not ComboBox cb) return;
-        // The TwoWay binding already wrote to step.Payload — just update Port
         if (cb.DataContext is BuilderStep step && cb.SelectedItem is string name)
         {
             step.Port = PayloadSender.GetDefaultPort(name);
@@ -166,20 +170,126 @@ public partial class FlowBuilderPage : UserControl
         SyncFlowToConfig();
     }
 
-    // ── Save as profile ──────────────────────────────────────────────────────
+    // ── Save as profile (with name dialog) ───────────────────────────────────
 
     private void BtnSaveProfile_Click(object sender, RoutedEventArgs e)
     {
         if (_steps.Count == 0) { AppendLog("Flow is empty — nothing to save."); return; }
-        var name = string.IsNullOrWhiteSpace(TxtFlowName.Text)
-            ? $"flow_{DateTime.Now:yyyyMMdd_HHmm}.txt"
-            : $"{TxtFlowName.Text.Trim()}.txt";
-        var content = string.Join("\n", _steps.Select(s => s.ToProfileLine()).Where(l => l.Length > 0));
+        TxtSaveError.Visibility = Visibility.Collapsed;
+        SaveNamePanel.Visibility = Visibility.Visible;
+        TxtSaveName.Focus();
+        TxtSaveName.SelectAll();
+    }
+
+    private void BtnConfirmSave_Click(object sender, RoutedEventArgs e)
+    {
+        var name = TxtSaveName.Text.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            TxtSaveError.Text = "Please enter a name for the flow.";
+            TxtSaveError.Visibility = Visibility.Visible;
+            return;
+        }
+
+        var fileName = $"{name}.txt";
+        var content  = string.Join("\n", _steps.Select(s => s.ToProfileLine()).Where(l => l.Length > 0));
         Directory.CreateDirectory(AppPaths.ProfilesDir);
-        File.WriteAllText(Path.Combine(AppPaths.ProfilesDir, name), content);
-        MainWindow.Config.Profiles[name] = content;
+        File.WriteAllText(Path.Combine(AppPaths.ProfilesDir, fileName), content);
+        MainWindow.Config.Profiles[fileName] = content;
+        MainWindow.Config.State.BuilderProfileName = name;
         MainWindow.SaveConfig();
-        AppendLog($"Saved: {name}");
+
+        SaveNamePanel.Visibility = Visibility.Collapsed;
+        AppendLog($"Saved: {fileName}");
+    }
+
+    private void BtnCancelSave_Click(object sender, RoutedEventArgs e)
+    {
+        SaveNamePanel.Visibility = Visibility.Collapsed;
+    }
+
+    // ── Export Autoload ZIP ───────────────────────────────────────────────────
+
+    private void BtnExportZip_Click(object sender, RoutedEventArgs e)
+    {
+        if (_steps.Count == 0) { AppendLog("Flow is empty — nothing to export."); return; }
+
+        // Validate: at least one ELF/BIN payload
+        var elfSteps = _steps
+            .Where(s => s.Type == "payload"
+                     && !s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (elfSteps.Count == 0)
+        {
+            AppendLog("No valid payloads for autoload export (need .elf or .bin).");
+            return;
+        }
+
+        // Warnings for unsupported content
+        bool hasWait = _steps.Any(s => s.Type == "wait_port");
+        bool hasLua  = _steps.Any(s => s.Type == "payload"
+                           && s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
+
+        if (hasWait)
+            AppendLog("Warning: WAIT steps are not supported in autoload.txt and will be skipped.");
+        if (hasLua)
+            AppendLog("Warning: Lua payloads are not supported in autoload export and will be skipped.");
+
+        // Build autoload.txt content
+        //  Format: !<ms>  then  filename   (no wait, no lua)
+        var sb = new StringBuilder();
+        foreach (var step in _steps)
+        {
+            if (step.Type == "delay")
+                sb.AppendLine($"!{step.Ms}");
+            else if (step.Type == "payload"
+                  && !step.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+                sb.AppendLine(step.Payload);
+            // wait_port and lua → skip
+        }
+
+        // Save dialog
+        var dlg = new SaveFileDialog
+        {
+            Title    = "Export PS5 Autoload ZIP",
+            Filter   = "ZIP files (*.zip)|*.zip",
+            FileName = "ps5-autoloader.zip"
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        try
+        {
+            using var zip = ZipFile.Open(dlg.FileName, ZipArchiveMode.Create);
+
+            // autoload.txt
+            var txtEntry = zip.CreateEntry("ps5_autoloader/autoload.txt");
+            using (var writer = new StreamWriter(txtEntry.Open()))
+                writer.Write(sb.ToString());
+
+            // Payload files
+            int copied = 0;
+            foreach (var step in elfSteps)
+            {
+                var src = Path.Combine(AppPaths.PayloadsDir, step.Payload);
+                if (!File.Exists(src))
+                {
+                    AppendLog($"Warning: {step.Payload} not downloaded — skipped in ZIP.");
+                    continue;
+                }
+                var fileEntry = zip.CreateEntry($"ps5_autoloader/{step.Payload}");
+                using var dest = fileEntry.Open();
+                using var srcStream = File.OpenRead(src);
+                srcStream.CopyTo(dest);
+                copied++;
+            }
+
+            AppendLog($"Exported: {Path.GetFileName(dlg.FileName)}  ({copied} payload(s), autoload.txt)");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Export error: {ex.Message}");
+        }
     }
 
     // ── Run / Stop ───────────────────────────────────────────────────────────
