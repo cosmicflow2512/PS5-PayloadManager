@@ -50,6 +50,13 @@ public class GhContent
 
     [JsonPropertyName("size")]
     public long Size { get; set; }
+
+    /// <summary>
+    /// Git blob SHA returned by the GitHub Contents API for file entries.
+    /// Used as a remote hash to detect changes without downloading the file.
+    /// </summary>
+    [JsonPropertyName("sha")]
+    public string Sha { get; set; } = "";
 }
 
 public class GitHubClient

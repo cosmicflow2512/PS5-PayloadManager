@@ -88,18 +88,23 @@ public partial class PayloadsPage : UserControl
                     var found = await MainWindow.PayloadMgr.ScanSourceAsync(src);
                     Dispatcher.Invoke(() =>
                     {
-                        foreach (var (name, _, version, size) in found)
+                        foreach (var (name, _, version, size, remoteHash) in found)
                         {
                             if (!MainWindow.Config.PayloadMeta.ContainsKey(name))
+                            {
                                 MainWindow.Config.PayloadMeta[name] = new PayloadMeta
                                     { SourceUrl = src.Url, Versions = new() { version }, Version = version, Size = size };
+                            }
                             else
                             {
                                 var meta = MainWindow.Config.PayloadMeta[name];
                                 if (!meta.Versions.Contains(version)) meta.Versions.Add(version);
-                                // Mark update available if latest differs from current
-                                if (meta.Versions.Count > 0 && meta.Versions[^1] != meta.Version)
-                                    meta.HasUpdateAvailable = true;
+
+                                bool versionChanged = version != "folder" && meta.Version != version;
+                                bool hashChanged    = remoteHash != null
+                                                   && !string.IsNullOrEmpty(meta.FileHash)
+                                                   && remoteHash != meta.FileHash;
+                                meta.HasUpdateAvailable = versionChanged || hashChanged;
                             }
                         }
                     });
@@ -258,6 +263,10 @@ public class PayloadEntry : System.ComponentModel.INotifyPropertyChanged
     public PayloadMeta Meta             { get; }
     public List<string> AvailableVersions => Meta.Versions;
     public string?     CurrentVersion   => Meta.Version;
+    public string      CurrentVersionDisplay =>
+        Meta.HasUpdateAvailable
+            ? $"{Meta.Version}  —  Update available"
+            : $"{Meta.Version}  —  Latest";
     public string      SelectedVersion  { get; set; }
     public bool        IsDownloaded     => Meta.IsDownloaded;
     public bool        HasUpdate        => Meta.HasUpdateAvailable;

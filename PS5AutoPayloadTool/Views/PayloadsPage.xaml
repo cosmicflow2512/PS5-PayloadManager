@@ -94,9 +94,19 @@
                                                 <TextBlock Text="Current: "
                                                            Foreground="{StaticResource FgSubtle}"
                                                            FontSize="11"/>
-                                                <TextBlock Text="{Binding CurrentVersion}"
-                                                           Foreground="{StaticResource Accent}"
-                                                           FontSize="11" FontFamily="Consolas"/>
+                                                <TextBlock Text="{Binding CurrentVersionDisplay}"
+                                                           FontSize="11" FontFamily="Consolas">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{StaticResource Green}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HasUpdate}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{StaticResource Yellow}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </StackPanel>
                                         </StackPanel>
 
