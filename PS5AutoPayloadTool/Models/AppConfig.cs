@@ -273,7 +273,7 @@ public class BuilderStep : System.ComponentModel.INotifyPropertyChanged
     };
 
     /// <summary>
-    /// Version badge shown next to the payload ComboBox in the Autoload Builder.
+    /// Version badge shown next to the version ComboBox in the Autoload Builder.
     /// Set externally by FlowBuilderPage.UpdateVersionLabels().
     /// </summary>
     private string _versionLabel = "";
@@ -282,6 +282,30 @@ public class BuilderStep : System.ComponentModel.INotifyPropertyChanged
     {
         get => _versionLabel;
         set { _versionLabel = value; Notify(nameof(VersionLabel)); }
+    }
+
+    /// <summary>
+    /// The version selected for this step in the builder (persisted).
+    /// "Latest" means use the most recent available version.
+    /// </summary>
+    private string _selectedVersion = "Latest";
+    [JsonPropertyName("selected_version")]
+    public string SelectedVersion
+    {
+        get => _selectedVersion;
+        set { _selectedVersion = value; Notify(nameof(SelectedVersion)); }
+    }
+
+    /// <summary>
+    /// Available version options for the version ComboBox (not persisted).
+    /// Populated by FlowBuilderPage.UpdateVersionLabels().
+    /// </summary>
+    private List<string> _versionOptions = new() { "Latest" };
+    [JsonIgnore]
+    public List<string> VersionOptions
+    {
+        get => _versionOptions;
+        set { _versionOptions = value; Notify(nameof(VersionOptions)); }
     }
 
     /// <summary>

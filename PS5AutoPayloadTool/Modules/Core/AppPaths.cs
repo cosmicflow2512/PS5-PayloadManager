@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace PS5AutoPayloadTool.Core;
+namespace PS5AutoPayloadTool.Modules.Core;
 
 /// <summary>
 /// Centralises every path the application uses.

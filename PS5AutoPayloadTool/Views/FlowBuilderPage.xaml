@@ -169,20 +169,23 @@
                                                 <ComboBox ItemsSource="{Binding DataContext.PayloadNames,
                                                               RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                           SelectedItem="{Binding Payload, Mode=TwoWay}"
-                                                          Width="190" FontSize="12"
+                                                          Width="180" FontSize="12"
+                                                          VerticalAlignment="Center"
                                                           SelectionChanged="CmbStepPayload_SelectionChanged"/>
-                                                <TextBlock Text="{Binding VersionLabel}"
-                                                           Foreground="{StaticResource FgSubtle}"
-                                                           VerticalAlignment="Center"
-                                                           FontSize="11"
-                                                           FontStyle="Italic"
-                                                           Margin="5,0,0,0"/>
+                                                <ComboBox ItemsSource="{Binding VersionOptions}"
+                                                          SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
+                                                          Width="100" FontSize="11"
+                                                          VerticalAlignment="Center"
+                                                          Margin="4,0,0,0"
+                                                          SelectionChanged="CmbStepVersion_SelectionChanged"/>
                                                 <TextBlock Text=" → "
                                                            Foreground="{StaticResource FgSubtle}"
-                                                           VerticalAlignment="Center" FontSize="12"/>
+                                                           VerticalAlignment="Center" FontSize="12"
+                                                           Margin="2,0"/>
                                                 <TextBox Text="{Binding Port, Mode=TwoWay,
                                                              UpdateSourceTrigger=LostFocus}"
                                                          Width="68" MinWidth="68"
+                                                         VerticalAlignment="Center"
                                                          FontFamily="Consolas"
                                                          LostFocus="StepField_LostFocus"/>
                                             </StackPanel>

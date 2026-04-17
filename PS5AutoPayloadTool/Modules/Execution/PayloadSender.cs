@@ -2,7 +2,7 @@ using System.IO;
 using System.Net.Sockets;
 using PS5AutoPayloadTool.Models;
 
-namespace PS5AutoPayloadTool.Core;
+namespace PS5AutoPayloadTool.Modules.Execution;
 
 public record PayloadSendResult(bool Success, string Message, long BytesSent);
 

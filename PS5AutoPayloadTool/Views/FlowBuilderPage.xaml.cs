@@ -1,13 +1,14 @@
 using System.Collections.ObjectModel;
 using System.IO;
-using System.IO.Compression;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Microsoft.Win32;
-using PS5AutoPayloadTool.Core;
 using PS5AutoPayloadTool.Models;
+using PS5AutoPayloadTool.Modules.Builder;
+using PS5AutoPayloadTool.Modules.Core;
+using PS5AutoPayloadTool.Modules.Execution;
 
 namespace PS5AutoPayloadTool.Views;
 
@@ -17,18 +18,15 @@ public partial class FlowBuilderPage : UserControl
     private readonly ExecEngine _engine = new();
     private bool _loading;
 
-    // Exposed for DataTemplate RelativeSource bindings
     public List<string> PayloadNames { get; private set; } = new();
 
-    // Port indicator dots
     private static readonly SolidColorBrush _dotOff = new(Color.FromRgb(69,  71,  90));
     private static readonly SolidColorBrush _dotOn  = new(Color.FromRgb(166, 227, 161));
 
-    // Compatibility badge colours
-    private static readonly SolidColorBrush _badgeBgCompat   = new(Color.FromRgb(30,  58,  47));
-    private static readonly SolidColorBrush _badgeBgIncompat  = new(Color.FromRgb(58,  30,  30));
-    private static readonly SolidColorBrush _badgeFgCompat   = new(Color.FromRgb(166, 227, 161));
-    private static readonly SolidColorBrush _badgeFgIncompat  = new(Color.FromRgb(243, 139, 168));
+    private static readonly SolidColorBrush _badgeBgCompat  = new(Color.FromRgb(30,  58,  47));
+    private static readonly SolidColorBrush _badgeBgIncompat = new(Color.FromRgb(58,  30,  30));
+    private static readonly SolidColorBrush _badgeFgCompat  = new(Color.FromRgb(166, 227, 161));
+    private static readonly SolidColorBrush _badgeFgIncompat = new(Color.FromRgb(243, 139, 168));
 
     public FlowBuilderPage()
     {
@@ -78,7 +76,6 @@ public partial class FlowBuilderPage : UserControl
         foreach (var s in MainWindow.Config.State.BuilderSteps)
             _steps.Add(s);
 
-        // Update port labels with configured values
         var ports = MainWindow.Config.Ports;
         TxtLuaPortLabel.Text = $"Lua {ports.LuaPort}";
         TxtElfPortLabel.Text = $"ELF {ports.ElfPort}";
@@ -102,10 +99,7 @@ public partial class FlowBuilderPage : UserControl
 
     private void UpdateCompatibilityBadge()
     {
-        bool hasWait = _steps.Any(s => s.Type == "wait_port");
-        bool hasLua  = _steps.Any(s => s.Type == "payload" &&
-                       s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
-        bool ok = !hasWait && !hasLua;
+        bool ok = FlowService.IsAutoloadCompatible(_steps, out _);
 
         CompatBadge.Background    = ok ? _badgeBgCompat  : _badgeBgIncompat;
         TxtCompatBadge.Foreground = ok ? _badgeFgCompat  : _badgeFgIncompat;
@@ -178,9 +172,21 @@ public partial class FlowBuilderPage : UserControl
         if (sender is not ComboBox cb) return;
         if (cb.DataContext is BuilderStep step && cb.SelectedItem is string name)
         {
-            step.Port = PayloadSender.GetDefaultPort(name, MainWindow.Config.Ports);
+            step.Port            = PayloadSender.GetDefaultPort(name, MainWindow.Config.Ports);
+            step.SelectedVersion = "Latest";
             UpdateCompatibilityBadge();
             UpdateVersionLabels();
+            SyncFlowToConfig();
+        }
+    }
+
+    private void CmbStepVersion_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        if (sender is not ComboBox cb) return;
+        if (cb.DataContext is BuilderStep step && cb.SelectedItem is string version)
+        {
+            step.SelectedVersion = version;
             SyncFlowToConfig();
         }
     }
@@ -212,12 +218,12 @@ public partial class FlowBuilderPage : UserControl
         SyncFlowToConfig();
     }
 
-    // ── Save as profile (with name dialog) ───────────────────────────────────
+    // ── Save as profile ───────────────────────────────────────────────────────
 
     private void BtnSaveProfile_Click(object sender, RoutedEventArgs e)
     {
         if (_steps.Count == 0) { AppendLog("Flow is empty — nothing to save."); return; }
-        TxtSaveError.Visibility = Visibility.Collapsed;
+        TxtSaveError.Visibility  = Visibility.Collapsed;
         SaveNamePanel.Visibility = Visibility.Visible;
         TxtSaveName.Focus();
         TxtSaveName.SelectAll();
@@ -228,7 +234,7 @@ public partial class FlowBuilderPage : UserControl
         var name = TxtSaveName.Text.Trim();
         if (string.IsNullOrEmpty(name))
         {
-            TxtSaveError.Text = "Please enter a name for the flow.";
+            TxtSaveError.Text       = "Please enter a name for the flow.";
             TxtSaveError.Visibility = Visibility.Visible;
             return;
         }
@@ -237,8 +243,8 @@ public partial class FlowBuilderPage : UserControl
         var content  = string.Join("\n", _steps.Select(s => s.ToProfileLine()).Where(l => l.Length > 0));
         Directory.CreateDirectory(AppPaths.ProfilesDir);
         File.WriteAllText(Path.Combine(AppPaths.ProfilesDir, fileName), content);
-        MainWindow.Config.Profiles[fileName] = content;
-        MainWindow.Config.State.BuilderProfileName = name;
+        MainWindow.Config.Profiles[fileName]          = content;
+        MainWindow.Config.State.BuilderProfileName    = name;
         MainWindow.SaveConfig();
 
         SaveNamePanel.Visibility = Visibility.Collapsed;
@@ -252,23 +258,16 @@ public partial class FlowBuilderPage : UserControl
 
     // ── Export Autoload ZIP ───────────────────────────────────────────────────
 
-    private void BtnExportZip_Click(object sender, RoutedEventArgs e)
+    private async void BtnExportZip_Click(object sender, RoutedEventArgs e)
     {
         if (_steps.Count == 0) { AppendLog("Flow is empty — nothing to export."); return; }
 
-        bool hasWait = _steps.Any(s => s.Type == "wait_port");
-        bool hasLua  = _steps.Any(s => s.Type == "payload"
-                           && s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
-
-        if (hasWait || hasLua)
+        // Compatibility check — offer to remove incompatible steps
+        if (!FlowService.IsAutoloadCompatible(_steps, out var incompatible))
         {
-            var what = new List<string>();
-            if (hasWait) what.Add("WAIT step(s)");
-            if (hasLua)  what.Add("Lua payload(s)");
-            var whatStr = string.Join(" and ", what);
-
-            var answer = MessageBox.Show(
-                $"This flow contains {whatStr} which are not supported in autoload.txt.\n\n" +
+            var whatStr = string.Join(", ", incompatible.Take(3));
+            var answer  = MessageBox.Show(
+                $"This flow contains incompatible step(s): {whatStr}.\n\n" +
                 "Remove incompatible steps and export anyway?",
                 "Incompatible Steps",
                 MessageBoxButton.YesNo,
@@ -276,35 +275,21 @@ public partial class FlowBuilderPage : UserControl
 
             if (answer != MessageBoxResult.Yes) return;
 
-            var toRemove = _steps
-                .Where(s => s.Type == "wait_port" ||
-                            (s.Type == "payload" && s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-            foreach (var s in toRemove) _steps.Remove(s);
+            int removed = FlowService.RemoveIncompatibleSteps(_steps);
             UpdateCompatibilityBadge();
             SyncFlowToConfig();
-            AppendLog($"Removed {toRemove.Count} incompatible step(s) before export.");
+            AppendLog($"Removed {removed} incompatible step(s) before export.");
         }
 
         var elfSteps = _steps
-            .Where(s => s.Type == "payload"
-                     && !s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+            .Where(s => s.Type == "payload" &&
+                        !s.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         if (elfSteps.Count == 0)
         {
             AppendLog("No valid payloads for autoload export (need .elf or .bin).");
             return;
-        }
-
-        var sb = new StringBuilder();
-        foreach (var step in _steps)
-        {
-            if (step.Type == "delay")
-                sb.AppendLine($"!{step.Ms}");
-            else if (step.Type == "payload"
-                  && !step.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
-                sb.AppendLine(step.Payload);
         }
 
         var dlg = new SaveFileDialog
@@ -315,35 +300,29 @@ public partial class FlowBuilderPage : UserControl
         };
         if (dlg.ShowDialog() != true) return;
 
+        if (sender is Button exportBtn) exportBtn.IsEnabled = false;
         try
         {
-            using var zip = ZipFile.Open(dlg.FileName, ZipArchiveMode.Create);
+            var progress    = new Progress<string>(AppendLog);
+            var autoloadTxt = FlowService.BuildAutoloadTxt(_steps);
 
-            var txtEntry = zip.CreateEntry("ps5_autoloader/autoload.txt");
-            using (var writer = new StreamWriter(txtEntry.Open()))
-                writer.Write(sb.ToString());
+            var result = await MainWindow.ExportSvc.ExportAutoloadZipAsync(
+                dlg.FileName, autoloadTxt, elfSteps, MainWindow.Config, progress);
 
-            int copied = 0;
-            foreach (var step in elfSteps)
+            if (result.Error != null)
             {
-                var src = Path.Combine(AppPaths.PayloadsDir, step.Payload);
-                if (!File.Exists(src))
-                {
-                    AppendLog($"Warning: {step.Payload} not downloaded — skipped in ZIP.");
-                    continue;
-                }
-                var fileEntry = zip.CreateEntry($"ps5_autoloader/{step.Payload}");
-                using var dest = fileEntry.Open();
-                using var srcStream = File.OpenRead(src);
-                srcStream.CopyTo(dest);
-                copied++;
+                AppendLog($"Export error: {result.Error}");
             }
-
-            AppendLog($"Exported: {Path.GetFileName(dlg.FileName)}  ({copied} payload(s), autoload.txt)");
+            else
+            {
+                var skipNote = result.Skipped > 0 ? $", {result.Skipped} skipped" : "";
+                AppendLog($"Exported: {Path.GetFileName(dlg.FileName)}  " +
+                          $"({result.Copied} payload(s){skipNote}, autoload.txt)");
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            AppendLog($"Export error: {ex.Message}");
+            if (sender is Button b) b.IsEnabled = true;
         }
     }
 
@@ -400,31 +379,11 @@ public partial class FlowBuilderPage : UserControl
     }
 
     /// <summary>
-    /// Refreshes the VersionLabel on every payload step so the badge next to
-    /// the ComboBox stays current (e.g. "(Latest)" or "(v1.03)").
+    /// Delegates version data refresh to <see cref="FlowService.UpdateVersionData"/>.
+    /// Keeps views free of version-resolution logic.
     /// </summary>
-    private void UpdateVersionLabels()
-    {
-        foreach (var step in _steps)
-        {
-            if (step.Type != "payload" || string.IsNullOrEmpty(step.Payload))
-            {
-                step.VersionLabel = "";
-                continue;
-            }
-
-            if (MainWindow.Config.PayloadMeta.TryGetValue(step.Payload, out var meta)
-                && !string.IsNullOrEmpty(meta.Version))
-            {
-                var isLatest = meta.Versions.Count > 0 && meta.Versions[0] == meta.Version;
-                step.VersionLabel = isLatest ? "(Latest)" : $"({meta.Version})";
-            }
-            else
-            {
-                step.VersionLabel = "";
-            }
-        }
-    }
+    private void UpdateVersionLabels() =>
+        FlowService.UpdateVersionData(_steps, MainWindow.Config);
 
     private void SyncFlowToConfig()
     {

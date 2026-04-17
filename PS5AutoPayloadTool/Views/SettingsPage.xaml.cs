@@ -4,8 +4,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
-using PS5AutoPayloadTool.Core;
 using PS5AutoPayloadTool.Models;
+using PS5AutoPayloadTool.Modules.Core;
+using PS5AutoPayloadTool.Modules.Devices;
+using PS5AutoPayloadTool.Modules.Execution;
 
 namespace PS5AutoPayloadTool.Views;
 
@@ -13,15 +15,12 @@ public partial class SettingsPage : UserControl
 {
     private bool _loading;
 
-    public SettingsPage()
-    {
-        InitializeComponent();
-    }
+    public SettingsPage() { InitializeComponent(); }
 
     public void Refresh()
     {
-        _loading = true;
-        TxtToken.Text = MainWindow.Config.GitHubToken;
+        _loading         = true;
+        TxtToken.Text    = MainWindow.Config.GitHubToken;
         TxtDataPath.Text = AppPaths.Base;
 
         RefreshDevices();
@@ -30,15 +29,14 @@ public partial class SettingsPage : UserControl
             ? Directory.GetFiles(AppPaths.PayloadsDir).Length : 0;
         var profileCount = Directory.Exists(AppPaths.ProfilesDir)
             ? Directory.GetFiles(AppPaths.ProfilesDir, "*.txt").Length : 0;
-        long cacheBytes = GetDirSize(AppPaths.CacheDir);
-        TxtStats.Text = $"{payloadCount} payload(s)  •  {profileCount} profile(s)  •  cache {FormatBytes(cacheBytes)}";
+        long cacheBytes  = GetDirSize(AppPaths.CacheDir);
+        TxtStats.Text    = $"{payloadCount} payload(s)  •  {profileCount} profile(s)  •  cache {FormatBytes(cacheBytes)}";
 
-        // Port settings
         TxtElfPort.Text = MainWindow.Config.Ports.ElfPort.ToString();
         TxtLuaPort.Text = MainWindow.Config.Ports.LuaPort.ToString();
         TxtBinPort.Text = MainWindow.Config.Ports.BinPort.ToString();
 
-        _loading = false;
+        _loading       = false;
         TxtStatus.Text = "";
     }
 
@@ -50,7 +48,7 @@ public partial class SettingsPage : UserControl
         TxtNoDevices.Visibility = devices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    // ── Inputs ───────────────────────────────────────────────────────────────
+    // ── Token ────────────────────────────────────────────────────────────────
 
     private void TxtToken_TextChanged(object sender, TextChangedEventArgs e)
     {
@@ -69,8 +67,8 @@ public partial class SettingsPage : UserControl
 
     private void BtnAddDevice_Click(object sender, RoutedEventArgs e)
     {
-        TxtDeviceName.Text = "";
-        TxtDeviceIp.Text   = "192.168.1.";
+        TxtDeviceName.Text       = "";
+        TxtDeviceIp.Text         = "192.168.1.";
         AddDeviceForm.Visibility = Visibility.Visible;
         TxtDeviceIp.Focus();
     }
@@ -86,16 +84,12 @@ public partial class SettingsPage : UserControl
             return;
         }
 
-        if (MainWindow.Config.Devices.Any(d => d.Ip == ip))
+        var device = DeviceService.Add(MainWindow.Config, ip, name);
+        if (device == null)
         {
             TxtStatus.Text = "A device with that IP already exists.";
             return;
         }
-
-        MainWindow.Config.Devices.Add(new DeviceConfig { Name = name, Ip = ip });
-
-        if (MainWindow.Config.Devices.Count == 1)
-            MainWindow.Config.PS5Host = ip;
 
         MainWindow.SaveConfig();
         AddDeviceForm.Visibility = Visibility.Collapsed;
@@ -111,15 +105,7 @@ public partial class SettingsPage : UserControl
     private void BtnRemoveDevice_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as Button)?.Tag is not DeviceConfig dev) return;
-
-        MainWindow.Config.Devices.Remove(dev);
-
-        if (MainWindow.Config.PS5Host == dev.Ip)
-        {
-            var next = MainWindow.Config.Devices.FirstOrDefault();
-            MainWindow.Config.PS5Host = next?.Ip ?? "192.168.1.100";
-        }
-
+        DeviceService.Remove(MainWindow.Config, dev);
         MainWindow.SaveConfig();
         RefreshDevices();
         SaveAndNotify();
@@ -129,28 +115,25 @@ public partial class SettingsPage : UserControl
 
     private void BtnSavePorts_Click(object sender, RoutedEventArgs e)
     {
-        // Validate ELF port
         if (!int.TryParse(TxtElfPort.Text.Trim(), out var newElf) || newElf < 1 || newElf > 65535)
         {
-            TxtStatus.Text = "ELF port must be 1–65535.";
+            TxtStatus.Text  = "ELF port must be 1–65535.";
             TxtElfPort.Text = MainWindow.Config.Ports.ElfPort.ToString();
             return;
         }
 
-        // Validate LUA port
         if (!int.TryParse(TxtLuaPort.Text.Trim(), out var newLua) || newLua < 1 || newLua > 65535)
         {
-            TxtStatus.Text = "LUA port must be 1–65535.";
+            TxtStatus.Text  = "LUA port must be 1–65535.";
             TxtLuaPort.Text = MainWindow.Config.Ports.LuaPort.ToString();
             return;
         }
 
-        // Validate BIN port (0 is allowed — means "use ELF port")
         var binText = TxtBinPort.Text.Trim();
         if (string.IsNullOrEmpty(binText)) binText = "0";
         if (!int.TryParse(binText, out var newBin) || newBin < 0 || newBin > 65535)
         {
-            TxtStatus.Text = "BIN port must be 0 or 1–65535.";
+            TxtStatus.Text  = "BIN port must be 0 or 1–65535.";
             TxtBinPort.Text = MainWindow.Config.Ports.BinPort.ToString();
             return;
         }
@@ -167,7 +150,6 @@ public partial class SettingsPage : UserControl
 
         if (!changed) return;
 
-        // Offer to update existing builder payload steps
         var payloadSteps = MainWindow.Config.State.BuilderSteps
             .Where(s => s.Type == "payload").ToList();
 
@@ -195,9 +177,8 @@ public partial class SettingsPage : UserControl
         Process.Start(new ProcessStartInfo { FileName = AppPaths.Base, UseShellExecute = true });
     }
 
-    // ── Export ───────────────────────────────────────────────────────────────
+    // ── Backup export ─────────────────────────────────────────────────────────
 
-    /// <summary>Exports config + optional payload files as a portable ZIP backup.</summary>
     private void BtnExportBackup_Click(object sender, RoutedEventArgs e)
     {
         bool includePayloads = ChkIncludePayloads.IsChecked == true;
@@ -213,10 +194,10 @@ public partial class SettingsPage : UserControl
         try
         {
             ConfigManager.ExportBackupZip(MainWindow.Config, includePayloads, dlg.FileName);
-            var payloadCount = Directory.Exists(AppPaths.PayloadsDir)
+            var count = Directory.Exists(AppPaths.PayloadsDir)
                 ? Directory.GetFiles(AppPaths.PayloadsDir).Length : 0;
             TxtStatus.Text = includePayloads
-                ? $"Backup exported ({payloadCount} payload(s) included)."
+                ? $"Backup exported ({count} payload(s) included)."
                 : "Backup exported (config only — payloads not included).";
         }
         catch (Exception ex)
@@ -225,7 +206,6 @@ public partial class SettingsPage : UserControl
         }
     }
 
-    /// <summary>Exports config as plain JSON (for HA compatibility).</summary>
     private void BtnExport_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new SaveFileDialog
@@ -288,8 +268,7 @@ public partial class SettingsPage : UserControl
         MainWindow.Config.Devices            = imported.Devices;
         MainWindow.Config.State.BuilderSteps = imported.State.BuilderSteps;
 
-        // Fix up LocalPath for any payloads that already exist in PayloadsDir
-        // (covers payloads restored from ZIP and previously-downloaded payloads)
+        // Fix up LocalPath for payloads already present on disk
         foreach (var kv in MainWindow.Config.PayloadMeta)
         {
             var localFile = Path.Combine(AppPaths.PayloadsDir, kv.Key);
@@ -306,122 +285,46 @@ public partial class SettingsPage : UserControl
             ? $"Imported. {zCount} payload(s) restored from backup. Resolving missing payloads…"
             : "Config imported. Resolving missing payloads…";
 
-        // Auto-download any remaining missing payloads
         await ResolvePayloadsAsync(new HashSet<string>(restoredFromZip, StringComparer.OrdinalIgnoreCase));
     }
 
     // ── Payload auto-resolution ──────────────────────────────────────────────
 
-    /// <summary>
-    /// After import, checks every payload in PayloadMeta.  Payloads in
-    /// <paramref name="alreadyRestored"/> or already present on disk are skipped.
-    /// For the rest, the tool tries to download from the registered source:
-    ///   1. exact version match
-    ///   2. any version of that payload (fallback to latest)
-    ///   3. if no source → warn and skip
-    /// </summary>
     private async Task ResolvePayloadsAsync(HashSet<string> alreadyRestored)
     {
-        // Collect payloads whose file is genuinely absent
-        var missing = MainWindow.Config.PayloadMeta
-            .Where(kv => !alreadyRestored.Contains(kv.Key)
-                      && !File.Exists(Path.Combine(AppPaths.PayloadsDir, kv.Key)))
-            .ToList();
-
-        if (missing.Count == 0)
-        {
-            HideRestoreProgress();
-            TxtStatus.Text = "Import complete. All payloads present.";
-            return;
-        }
-
-        PrgRestore.Value      = 0;
-        PrgRestore.Visibility = Visibility.Visible;
-        TxtRestoreLog.Text    = "";
+        PrgRestore.Value         = 0;
+        PrgRestore.Visibility    = Visibility.Visible;
+        TxtRestoreLog.Text       = "";
         TxtRestoreLog.Visibility = Visibility.Visible;
 
-        int resolved = 0;
+        int resolved = 0, total = 0;
 
-        for (int i = 0; i < missing.Count; i++)
+        var progress = new Progress<(string Name, string Message, double Pct)>(p =>
         {
-            var (name, meta) = missing[i];
-            PrgRestore.Value = (double)(i + 1) / missing.Count * 100;
-
-            // Re-check: might have been written as a side-effect of a sibling ZIP
-            var localFile = Path.Combine(AppPaths.PayloadsDir, name);
-            if (File.Exists(localFile))
+            Dispatcher.Invoke(() =>
             {
-                meta.LocalPath = localFile;
-                resolved++;
-                AppendRestoreLog($"{name}: found locally.");
-                continue;
-            }
+                AppendRestoreLog(p.Message);
+                PrgRestore.Value = p.Pct;
+                if (p.Message.Contains("restored") || p.Message.Contains("found locally")
+                                                    || p.Message.Contains("updated to"))
+                    Interlocked.Increment(ref resolved);
+                Interlocked.Increment(ref total);
+            });
+        });
 
-            if (string.IsNullOrEmpty(meta.SourceUrl))
-            {
-                AppendRestoreLog($"{name}: no source — skipped.");
-                continue;
-            }
-
-            var source = MainWindow.Config.Sources.FirstOrDefault(s => s.Url == meta.SourceUrl);
-            if (source == null)
-            {
-                AppendRestoreLog($"{name}: source not in config — skipped.");
-                continue;
-            }
-
-            try
-            {
-                TxtStatus.Text = $"Downloading {name}…";
-
-                var found = await MainWindow.PayloadMgr.ScanSourceAsync(source);
-
-                // Priority: exact version → any version (latest first)
-                var match = found.FirstOrDefault(f => f.Name == name && f.Version == meta.Version);
-                if (match == default)
-                    match = found.FirstOrDefault(f => f.Name == name);
-
-                if (match == default)
-                {
-                    AppendRestoreLog($"{name}: not found in source — skipped.");
-                    continue;
-                }
-
-                await MainWindow.PayloadMgr.DownloadAsync(
-                    MainWindow.Config, name, match.DownloadUrl, match.Version, source.Url);
-
-                if (match.Version != meta.Version && !string.IsNullOrEmpty(meta.Version))
-                    AppendRestoreLog($"{name}: updated to {match.Version} (requested {meta.Version}).");
-                else
-                    AppendRestoreLog($"{name}: restored ({match.Version}).");
-
-                resolved++;
-            }
-            catch (Exception ex)
-            {
-                AppendRestoreLog($"{name}: download failed — {ex.Message}");
-            }
-        }
+        await MainWindow.PayloadSvc.ResolveAfterImportAsync(
+            MainWindow.Config, alreadyRestored, progress);
 
         MainWindow.SaveConfig();
         Refresh();
         PrgRestore.Value = 100;
-
-        TxtStatus.Text = resolved == missing.Count
-            ? $"Import complete. All {resolved} missing payload(s) resolved."
-            : $"Import complete. {resolved}/{missing.Count} payload(s) resolved. See log above for details.";
+        TxtStatus.Text   = "Import complete. See restore log for details.";
     }
 
     private void AppendRestoreLog(string line)
     {
         TxtRestoreLog.Text = string.IsNullOrEmpty(TxtRestoreLog.Text)
             ? line : TxtRestoreLog.Text + "\n" + line;
-    }
-
-    private void HideRestoreProgress()
-    {
-        PrgRestore.Visibility    = Visibility.Collapsed;
-        TxtRestoreLog.Visibility = Visibility.Collapsed;
     }
 
     // ── Factory reset ────────────────────────────────────────────────────────
@@ -476,8 +379,8 @@ public partial class SettingsPage : UserControl
 
     private static string FormatBytes(long bytes)
     {
-        if (bytes < 1024)             return $"{bytes} B";
-        if (bytes < 1024 * 1024)      return $"{bytes / 1024.0:F1} KB";
+        if (bytes < 1024)        return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
         return $"{bytes / 1024.0 / 1024.0:F1} MB";
     }
 }
