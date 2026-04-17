@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using PS5AutoPayloadTool.Models;
 using PS5AutoPayloadTool.Modules.Core;
 using PS5AutoPayloadTool.Modules.Sources;
+using Log = PS5AutoPayloadTool.Modules.Core.LogService;
 
 namespace PS5AutoPayloadTool.Modules.Payloads;
 
@@ -37,10 +38,12 @@ public class PayloadManager(GitHubClient github)
         CancellationToken ct = default)
     {
         var results = new List<ScanResult>();
+        Log.Debug("PayloadManager", $"Scan started: {source.Owner}/{source.Repo} ({source.Type})");
 
         if (source.Type == "release")
         {
             var releases = await github.GetReleasesAsync(source.Owner, source.Repo);
+            Log.Debug("PayloadManager", $"{source.Owner}/{source.Repo}: {releases.Count} release(s) fetched");
             foreach (var release in releases)
             {
                 ct.ThrowIfCancellationRequested();
@@ -56,6 +59,7 @@ public class PayloadManager(GitHubClient github)
                     }
                     else if (GitHubClient.IsZipFile(asset.Name))
                     {
+                        Log.Debug("PayloadManager", $"ZIP detected: {asset.Name} in {release.TagName}");
                         progress?.Report($"Scanning archive {asset.Name}…");
                         try
                         {
@@ -70,13 +74,18 @@ public class PayloadManager(GitHubClient github)
                                 results.Add(new ScanResult(
                                     entryName, zipUrl,
                                     release.TagName, entrySize, null, release.PublishedAt));
+                                Log.Debug("PayloadManager", $"  ZIP entry: {entryName} ({entrySize} bytes)");
                                 anyPayload = true;
                             }
                             if (!anyPayload)
+                            {
+                                Log.Warn("PayloadManager", $"No valid payloads found in {asset.Name}");
                                 progress?.Report($"No valid payloads found in {asset.Name}");
+                            }
                         }
                         catch (Exception ex)
                         {
+                            Log.Error("PayloadManager", $"Could not scan {asset.Name}: {ex.Message}");
                             progress?.Report($"Warning: could not scan {asset.Name}: {ex.Message}");
                         }
                     }
@@ -100,6 +109,7 @@ public class PayloadManager(GitHubClient github)
             }
         }
 
+        Log.Info("PayloadManager", $"Scan complete: {results.Count} payload(s) in {source.DisplayName}");
         progress?.Report($"Found {results.Count} payload(s) in {source.DisplayName}");
         return results;
     }
@@ -122,16 +132,27 @@ public class PayloadManager(GitHubClient github)
         Directory.CreateDirectory(versionDir);
         var cachePath = Path.Combine(versionDir, name);
 
+        Log.Info("PayloadManager", $"Downloading {name} v{version}");
+
         if (!File.Exists(cachePath))
         {
-            if (downloadUrl.StartsWith(ZipUrlPrefix))
+            bool isZip = downloadUrl.StartsWith(ZipUrlPrefix);
+            Log.Debug("PayloadManager", $"  Source: {(isZip ? "ZIP archive" : "direct URL")}");
+            if (isZip)
                 await DownloadFromZipAsync(downloadUrl, version, cachePath, progress, ct);
             else
                 await github.DownloadFileAsync(downloadUrl, cachePath, progress, ct);
         }
+        else
+        {
+            Log.Debug("PayloadManager", $"  Cache hit: {cachePath}");
+        }
 
         if (!File.Exists(cachePath))
+        {
+            Log.Error("PayloadManager", $"Download failed: '{name}' not in cache after download");
             throw new InvalidOperationException($"Could not obtain '{name}' (cache path missing after download).");
+        }
 
         Directory.CreateDirectory(AppPaths.PayloadsDir);
         var activePath = Path.Combine(AppPaths.PayloadsDir, name);
@@ -153,6 +174,7 @@ public class PayloadManager(GitHubClient github)
         meta.FileHash           = ComputeSha256(activePath);
         meta.HasUpdateAvailable = false;
         meta.SourceNotAvailable = false;
+        Log.Info("PayloadManager", $"Saved {name} v{version}  ({meta.Size} bytes  hash={meta.FileHash[..8]})");
     }
 
     /// <summary>
@@ -181,8 +203,11 @@ public class PayloadManager(GitHubClient github)
               ?? found.FirstOrDefault(f => f.Name == name);
 
         if (match == null)
+        {
+            Log.Error("PayloadManager", $"No valid payload found in release for '{name}' (source: {sourceUrl})");
             throw new InvalidOperationException(
                 $"No valid payload found in release for '{name}'.");
+        }
 
         await DownloadAsync(config, name, match.DownloadUrl, match.Version, sourceUrl, progress, ct);
     }
@@ -248,8 +273,11 @@ public class PayloadManager(GitHubClient github)
         }
 
         if (!File.Exists(requiredCachePath))
+        {
+            Log.Error("PayloadManager", $"Target not found in ZIP: {Path.GetFileName(requiredCachePath)}");
             throw new InvalidOperationException(
                 "The requested payload was not found inside the downloaded ZIP archive.");
+        }
     }
 
     // ── Hash ──────────────────────────────────────────────────────────────────

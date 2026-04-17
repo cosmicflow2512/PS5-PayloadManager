@@ -24,24 +24,18 @@ public partial class MainWindow : Window
     private static PayloadService? _payloadSvc;
     private static ExportService?  _exportSvc;
 
-    /// <summary>Source scanning and repo discovery (Sources module).</summary>
     public static SourceService  SourceSvc  => _sourceSvc  ??= new SourceService(GitHub, PayloadMgr);
-
-    /// <summary>Payload download, update detection, and local management (Payloads module).</summary>
     public static PayloadService PayloadSvc => _payloadSvc ??= new PayloadService(PayloadMgr);
-
-    /// <summary>Autoload ZIP creation and payload resolution (Export module).</summary>
     public static ExportService  ExportSvc  => _exportSvc  ??= new ExportService(PayloadMgr);
 
-    // FlowService and DeviceService are static classes — no instance needed.
-
-    // ── Page instances (created once, navigated between) ────────────────────
+    // ── Page instances ───────────────────────────────────────────────────────
 
     private readonly SourcesPage     _sourcesPage     = new();
     private readonly PayloadsPage    _payloadsPage    = new();
     private readonly FlowBuilderPage _flowBuilderPage = new();
     private readonly ProfilesPage    _profilesPage    = new();
     private readonly SettingsPage    _settingsPage    = new();
+    private readonly LogsPage        _logsPage        = new();
 
     // ── Port indicator brushes ───────────────────────────────────────────────
 
@@ -53,10 +47,11 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         Config     = ConfigManager.Load();
+        LogService.DebugMode = Config.State.DebugMode;
+
         GitHub     = new GitHubClient(string.IsNullOrWhiteSpace(Config.GitHubToken)
                          ? null : Config.GitHubToken);
         PayloadMgr = new PayloadManager(GitHub);
-        // Reset lazy service cache so next access picks up the new GitHub/PayloadMgr
         InvalidateServices();
 
         InitializeComponent();
@@ -101,17 +96,21 @@ public partial class MainWindow : Window
         _settingsPage.Refresh();
     }
 
+    private void NavLogs_Checked(object sender, RoutedEventArgs e)
+    {
+        if (ContentArea == null) return;
+        ContentArea.Content = _logsPage;
+        _logsPage.Refresh();
+    }
+
     // ── Public helpers called by pages ───────────────────────────────────────
 
     public static void SaveConfig() => ConfigManager.Save(Config);
 
-    /// <summary>
-    /// Called by SettingsPage when the host or GitHub token changes.
-    /// Recreates the GitHub client and invalidates lazy service instances.
-    /// </summary>
     public void OnConfigChanged()
     {
         UpdateSidebarDevice();
+        LogService.DebugMode = Config.State.DebugMode;
         GitHub     = new GitHubClient(string.IsNullOrWhiteSpace(Config.GitHubToken)
                          ? null : Config.GitHubToken);
         PayloadMgr = new PayloadManager(GitHub);
@@ -119,17 +118,12 @@ public partial class MainWindow : Window
         ConfigManager.Save(Config);
     }
 
-    /// <summary>
-    /// Navigates to the Autoload Builder and pre-loads steps.
-    /// Called from ProfilesPage when the user clicks Edit.
-    /// </summary>
     public void OpenInBuilder(List<Models.BuilderStep> steps, string? profileName = null)
     {
         NavFlow.IsChecked = true;
         _flowBuilderPage.LoadSteps(steps, profileName);
     }
 
-    /// <summary>Updates the sidebar port indicator dots.</summary>
     public void SetPortIndicators(bool luaOpen, bool elfOpen)
     {
         Dispatcher.Invoke(() =>
@@ -150,10 +144,6 @@ public partial class MainWindow : Window
         SidebarHost.Text = host;
     }
 
-    /// <summary>
-    /// Clears cached service instances so the next access recreates them
-    /// with the current GitHub client and PayloadManager.
-    /// </summary>
     private static void InvalidateServices()
     {
         _sourceSvc  = null;

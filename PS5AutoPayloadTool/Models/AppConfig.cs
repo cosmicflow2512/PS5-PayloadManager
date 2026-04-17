@@ -94,6 +94,9 @@ public class AppState
     [JsonPropertyName("advanced_mode")]
     public bool AdvancedMode { get; set; } = false;
 
+    [JsonPropertyName("debug_mode")]
+    public bool DebugMode { get; set; } = false;
+
     [JsonPropertyName("favorites")]
     public List<string> Favorites { get; set; } = new();
 }

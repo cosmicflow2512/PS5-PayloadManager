@@ -275,6 +275,22 @@
                 </StackPanel>
             </Border>
 
+            <!-- ── Diagnostics ───────────────────────────────────────── -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="DIAGNOSTICS" Style="{StaticResource SectionTitle}"/>
+                    <CheckBox x:Name="ChkDebugMode"
+                              Content="Debug Mode"
+                              Foreground="{StaticResource FgMain}"
+                              FontSize="12"
+                              Checked="ChkDebugMode_Changed"
+                              Unchecked="ChkDebugMode_Changed"/>
+                    <TextBlock Text="Enables DEBUG-level entries in the Logs tab and log file."
+                               Foreground="{StaticResource FgSubtle}"
+                               FontSize="11" Margin="20,3,0,0"/>
+                </StackPanel>
+            </Border>
+
             <!-- ── About ─────────────────────────────────────────────── -->
             <Border Style="{StaticResource Card}">
                 <StackPanel>

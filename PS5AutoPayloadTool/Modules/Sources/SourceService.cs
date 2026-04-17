@@ -1,6 +1,8 @@
 using System.Text.RegularExpressions;
 using PS5AutoPayloadTool.Models;
+using PS5AutoPayloadTool.Modules.Core;
 using PS5AutoPayloadTool.Modules.Payloads;
+using Log = PS5AutoPayloadTool.Modules.Core.LogService;
 
 namespace PS5AutoPayloadTool.Modules.Sources;
 
@@ -80,6 +82,7 @@ public class SourceService(GitHubClient github, PayloadManager payloads)
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
+        Log.Info("SourceService", $"Scanning {source.DisplayName} ({source.TypeLabel})");
         try
         {
             var found = await payloads.ScanSourceAsync(source, progress, ct);
@@ -93,10 +96,12 @@ public class SourceService(GitHubClient github, PayloadManager payloads)
                     config.PayloadMeta[r.Name].Versions.Add(r.Version);
             }
 
+            Log.Info("SourceService", $"Scan complete: {found.Count} payload(s) from {source.DisplayName}");
             return (found.Count, null);
         }
         catch (Exception ex)
         {
+            Log.Error("SourceService", $"Scan error for {source.DisplayName}: {ex.Message}");
             return (0, ex.Message);
         }
     }

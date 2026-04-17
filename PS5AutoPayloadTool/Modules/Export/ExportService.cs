@@ -3,6 +3,7 @@ using System.IO.Compression;
 using PS5AutoPayloadTool.Models;
 using PS5AutoPayloadTool.Modules.Core;
 using PS5AutoPayloadTool.Modules.Payloads;
+using Log = PS5AutoPayloadTool.Modules.Core.LogService;
 
 namespace PS5AutoPayloadTool.Modules.Export;
 
@@ -39,6 +40,7 @@ public class ExportService(PayloadManager manager)
         CancellationToken ct = default)
     {
         var steps = elfSteps.ToList();
+        Log.Info("ExportService", $"Export started: {Path.GetFileName(filePath)}  ({steps.Count} step(s))");
 
         await EnsurePayloadsDownloadedAsync(steps, config, progress, ct);
 
@@ -46,7 +48,6 @@ public class ExportService(PayloadManager manager)
         {
             using var zip = ZipFile.Open(filePath, ZipArchiveMode.Create);
 
-            // autoload.txt
             var txtEntry = zip.CreateEntry("ps5_autoloader/autoload.txt");
             using (var writer = new StreamWriter(txtEntry.Open()))
                 writer.Write(autoloadTxt);
@@ -57,6 +58,7 @@ public class ExportService(PayloadManager manager)
                 var src = ResolvePayloadPath(step);
                 if (src == null)
                 {
+                    Log.Warn("ExportService", $"Skipped: {step.Payload} not available locally");
                     progress?.Report($"Warning: {step.Payload} not available — skipped in ZIP.");
                     skipped++;
                     continue;
@@ -66,13 +68,16 @@ public class ExportService(PayloadManager manager)
                 using var dest      = entry.Open();
                 using var srcStream = File.OpenRead(src);
                 srcStream.CopyTo(dest);
+                Log.Debug("ExportService", $"  Added: {step.Payload}");
                 copied++;
             }
 
+            Log.Info("ExportService", $"Export complete: {copied} payload(s) copied, {skipped} skipped");
             return new ExportResult(copied, skipped);
         }
         catch (Exception ex)
         {
+            Log.Error("ExportService", $"Export failed: {ex.Message}");
             return new ExportResult(0, 0, ex.Message);
         }
     }

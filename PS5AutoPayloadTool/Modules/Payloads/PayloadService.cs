@@ -1,6 +1,7 @@
 using System.IO;
 using PS5AutoPayloadTool.Models;
 using PS5AutoPayloadTool.Modules.Core;
+using Log = PS5AutoPayloadTool.Modules.Core.LogService;
 
 namespace PS5AutoPayloadTool.Modules.Payloads;
 
@@ -109,11 +110,18 @@ public class PayloadService(PayloadManager manager)
 
                     meta.SourceNotAvailable = false;
                     meta.HasUpdateAvailable = versionChanged || hashChanged || sizeChanged || timestampNewer;
+                    Log.Debug("PayloadService",
+                        $"{r.Name}: local={meta.Version} remote={r.Version} " +
+                        $"update={meta.HasUpdateAvailable}" +
+                        (hashChanged    ? " [hash changed]"    : "") +
+                        (sizeChanged    ? " [size changed]"    : "") +
+                        (timestampNewer ? " [newer timestamp]" : ""));
                 }
                 progress?.Report($"Checked {source.DisplayName}.");
             }
             catch (Exception ex)
             {
+                Log.Error("PayloadService", $"Update check failed for {source.DisplayName}: {ex.Message}");
                 progress?.Report($"Error checking {source.DisplayName}: {ex.Message}");
             }
         }, ct)).ToList();
@@ -121,13 +129,14 @@ public class PayloadService(PayloadManager manager)
         await Task.WhenAll(tasks);
 
         // Mark payloads whose source URL is no longer in config
-        foreach (var (_, meta) in config.PayloadMeta)
+        foreach (var (name, meta) in config.PayloadMeta)
         {
             if (!string.IsNullOrEmpty(meta.SourceUrl)
                 && !config.Sources.Any(s => s.Url == meta.SourceUrl))
             {
                 meta.SourceNotAvailable = true;
                 meta.HasUpdateAvailable = false;
+                Log.Warn("PayloadService", $"{name}: source not in config ({meta.SourceUrl})");
             }
         }
     }
@@ -151,6 +160,7 @@ public class PayloadService(PayloadManager manager)
             var source = config.Sources.FirstOrDefault(s => s.Url == sourceUrl);
             if (source == null)
             {
+                Log.Error("PayloadService", $"Download failed for {name}: source not available ({sourceUrl})");
                 if (config.PayloadMeta.TryGetValue(name, out var m))
                 {
                     m.SourceNotAvailable = true;
@@ -158,6 +168,7 @@ public class PayloadService(PayloadManager manager)
                 }
                 return "Source not available.";
             }
+            Log.Info("PayloadService", $"Downloading {name} — version={version}  source={source.DisplayName}");
 
             var found = await manager.ScanSourceAsync(source, null, ct);
 

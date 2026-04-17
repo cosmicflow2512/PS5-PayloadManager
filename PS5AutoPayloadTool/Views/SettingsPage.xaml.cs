@@ -36,8 +36,19 @@ public partial class SettingsPage : UserControl
         TxtLuaPort.Text = MainWindow.Config.Ports.LuaPort.ToString();
         TxtBinPort.Text = MainWindow.Config.Ports.BinPort.ToString();
 
+        ChkDebugMode.IsChecked = MainWindow.Config.State.DebugMode;
         _loading       = false;
         TxtStatus.Text = "";
+    }
+
+    // ── Debug mode ───────────────────────────────────────────────────────────
+
+    private void ChkDebugMode_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        MainWindow.Config.State.DebugMode = ChkDebugMode.IsChecked == true;
+        LogService.DebugMode = MainWindow.Config.State.DebugMode;
+        SaveAndNotify();
     }
 
     private void RefreshDevices()

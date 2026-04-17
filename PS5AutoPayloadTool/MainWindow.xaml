@@ -98,6 +98,11 @@
                              GroupName="Nav"
                              Checked="NavSettings_Checked"
                              Style="{StaticResource NavBtn}"/>
+                <RadioButton x:Name="NavLogs"
+                             Content="&#x25A6;  Logs"
+                             GroupName="Nav"
+                             Checked="NavLogs_Checked"
+                             Style="{StaticResource NavBtn}"/>
             </StackPanel>
 
             <!-- Sidebar Footer: PS5 IP + port dots -->
