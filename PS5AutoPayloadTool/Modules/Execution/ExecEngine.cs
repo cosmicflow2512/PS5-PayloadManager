@@ -1,22 +1,24 @@
 using System.IO;
 using PS5AutoPayloadTool.Models;
 
-namespace PS5AutoPayloadTool.Core;
+namespace PS5AutoPayloadTool.Modules.Execution;
 
 public enum ExecState { Idle, Running, Paused, Stopped, Completed, Failed }
 
 public class ExecProgressEventArgs : EventArgs
 {
-    public string Message { get; init; } = "";
-    public ExecState State { get; init; }
-    public int StepIndex { get; init; }
-    public int TotalSteps { get; init; }
-    public bool IsError => Message.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase);
+    public string    Message    { get; init; } = "";
+    public ExecState State      { get; init; }
+    public int       StepIndex  { get; init; }
+    public int       TotalSteps { get; init; }
+    public bool      IsError    => Message.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>
 /// Executes a list of profile directives sequentially with
 /// pause / resume / stop support.
+/// Belongs in the Execution module — the UI subscribes to
+/// <see cref="ProgressChanged"/> for status updates.
 /// </summary>
 public class ExecEngine
 {
@@ -41,7 +43,7 @@ public class ExecEngine
     {
         if (State != ExecState.Running) return;
         _paused = true;
-        State = ExecState.Paused;
+        State   = ExecState.Paused;
         Raise("Execution paused.", ExecState.Paused, -1, -1);
     }
 
@@ -49,7 +51,7 @@ public class ExecEngine
     {
         if (State != ExecState.Paused) return;
         _paused = false;
-        State = ExecState.Running;
+        State   = ExecState.Running;
         _pauseGate.Release();
         Raise("Execution resumed.", ExecState.Running, -1, -1);
     }
@@ -62,9 +64,9 @@ public class ExecEngine
         bool continueOnError = false)
     {
         _cts?.Dispose();
-        _cts = new CancellationTokenSource();
+        _cts    = new CancellationTokenSource();
         _paused = false;
-        State = ExecState.Running;
+        State   = ExecState.Running;
 
         var ct = _cts.Token;
 
@@ -74,14 +76,13 @@ public class ExecEngine
             {
                 ct.ThrowIfCancellationRequested();
 
-                // ── Pause gate ──────────────────────────────────────────────
                 if (_paused)
                     await _pauseGate.WaitAsync(ct);
 
                 string result = directives[i] switch
                 {
-                    SendDirective s    => await RunSend(host, s, i, directives.Count, ct),
-                    DelayDirective d   => await RunDelay(d, i, directives.Count, ct),
+                    SendDirective    s => await RunSend(host, s, i, directives.Count, ct),
+                    DelayDirective   d => await RunDelay(d, i, directives.Count, ct),
                     WaitPortDirective w => await RunWaitPort(host, w, i, directives.Count, ct),
                     _                  => "Unknown directive — skipped."
                 };
@@ -119,7 +120,8 @@ public class ExecEngine
     private async Task<string> RunSend(
         string host, SendDirective s, int idx, int total, CancellationToken ct)
     {
-        Raise($"[{idx + 1}/{total}] Sending {Path.GetFileName(s.FilePath)} → :{s.Port}", ExecState.Running, idx, total);
+        Raise($"[{idx + 1}/{total}] Sending {Path.GetFileName(s.FilePath)} → :{s.Port}",
+              ExecState.Running, idx, total);
 
         var result = await PayloadSender.SendAsync(host, s.Port, s.FilePath, cancellationToken: ct);
 
@@ -167,9 +169,9 @@ public class ExecEngine
     private void Raise(string message, ExecState state, int stepIndex, int totalSteps)
         => ProgressChanged?.Invoke(this, new ExecProgressEventArgs
         {
-            Message = message,
-            State = state,
-            StepIndex = stepIndex,
+            Message    = message,
+            State      = state,
+            StepIndex  = stepIndex,
             TotalSteps = totalSteps
         });
 }

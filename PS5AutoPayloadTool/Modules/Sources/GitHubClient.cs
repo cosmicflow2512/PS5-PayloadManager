@@ -8,7 +8,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PS5AutoPayloadTool.Core;
+namespace PS5AutoPayloadTool.Modules.Sources;
 
 public class GhRelease
 {

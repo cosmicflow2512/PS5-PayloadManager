@@ -3,8 +3,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Microsoft.Win32;
-using PS5AutoPayloadTool.Core;
 using PS5AutoPayloadTool.Models;
+using PS5AutoPayloadTool.Modules.Core;
+using PS5AutoPayloadTool.Modules.Execution;
 
 namespace PS5AutoPayloadTool.Views;
 

@@ -1,7 +1,6 @@
-using System.IO;
 using System.Net.Sockets;
 
-namespace PS5AutoPayloadTool.Core;
+namespace PS5AutoPayloadTool.Modules.Execution;
 
 public static class PortChecker
 {
@@ -11,7 +10,6 @@ public static class PortChecker
         try
         {
             using var client = new TcpClient();
-            // ConnectAsync(string, int) returns Task — no .AsTask() needed
             var connectTask = client.ConnectAsync(host, port);
             var winner = await Task.WhenAny(connectTask, Task.Delay(timeoutMs));
             return winner == connectTask && !connectTask.IsFaulted;
@@ -53,7 +51,7 @@ public static class PortChecker
     }
 
     /// <summary>
-    /// Polls indefinitely until the port opens. Used by the Auto-Send loop.
+    /// Polls indefinitely until the port opens.
     /// Only stops when the <see cref="CancellationToken"/> is triggered.
     /// </summary>
     public static async Task WaitForPortOpenIndefiniteAsync(

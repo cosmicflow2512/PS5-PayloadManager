@@ -2,8 +2,10 @@ using System.IO;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using PS5AutoPayloadTool.Models;
+using PS5AutoPayloadTool.Modules.Core;
+using PS5AutoPayloadTool.Modules.Sources;
 
-namespace PS5AutoPayloadTool.Core;
+namespace PS5AutoPayloadTool.Modules.Payloads;
 
 public class PayloadManager(GitHubClient github)
 {
@@ -114,25 +116,18 @@ public class PayloadManager(GitHubClient github)
         if (!File.Exists(cachePath))
         {
             if (downloadUrl.StartsWith(ZipUrlPrefix))
-            {
                 await DownloadFromZipAsync(downloadUrl, version, cachePath, progress, ct);
-            }
             else
-            {
                 await github.DownloadFileAsync(downloadUrl, cachePath, progress, ct);
-            }
         }
 
-        // Verify the file was extracted/downloaded successfully
         if (!File.Exists(cachePath))
             throw new InvalidOperationException($"Could not obtain '{name}' (cache path missing after download).");
 
-        // Copy to active payloads directory
         Directory.CreateDirectory(AppPaths.PayloadsDir);
         var activePath = Path.Combine(AppPaths.PayloadsDir, name);
         File.Copy(cachePath, activePath, overwrite: true);
 
-        // Update payload_meta
         if (!config.PayloadMeta.TryGetValue(name, out var meta))
         {
             meta = new PayloadMeta { SourceUrl = sourceUrl };
@@ -150,7 +145,6 @@ public class PayloadManager(GitHubClient github)
     }
 
     /// <summary>
-    /// Legacy overload kept for backward compatibility with PayloadsPage.
     /// Resolves the download URL by rescanning the source, then delegates to DownloadAsync.
     /// </summary>
     public async Task DownloadPayloadAsync(
@@ -178,11 +172,6 @@ public class PayloadManager(GitHubClient github)
 
     // ── ZIP helpers ───────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Downloads a ZIP to a temp file, lists every entry (name, fullPath, size),
-    /// then deletes the temp file.  Used by ScanSourceAsync to enumerate payloads
-    /// inside release archives without permanently storing the archive.
-    /// </summary>
     private async Task<List<(string Name, string FullPath, long Size)>> PeekZipAsync(
         string zipUrl, CancellationToken ct)
     {
@@ -192,7 +181,7 @@ public class PayloadManager(GitHubClient github)
             await github.DownloadFileAsync(zipUrl, tempPath, null, ct);
             using var zip = ZipFile.OpenRead(tempPath);
             return zip.Entries
-                .Where(e => e.Length > 0)          // exclude directory entries
+                .Where(e => e.Length > 0)
                 .Select(e => (e.Name, e.FullName, e.Length))
                 .ToList();
         }
@@ -203,12 +192,6 @@ public class PayloadManager(GitHubClient github)
         }
     }
 
-    /// <summary>
-    /// Downloads a ZIP archive and extracts ALL payload files it contains into
-    /// their respective cache slots (CacheDir/{name}/{version}/{name}).  This
-    /// means that when a ZIP holds several payloads, downloading any one of them
-    /// caches the others for free — avoiding repeated ZIP downloads.
-    /// </summary>
     private async Task DownloadFromZipAsync(
         string zipDownloadUrl,
         string version,
@@ -216,7 +199,6 @@ public class PayloadManager(GitHubClient github)
         IProgress<(long, long)>? progress,
         CancellationToken ct)
     {
-        // Parse "zip:{zipUrl}|{entryFullName}"
         var inner  = zipDownloadUrl[ZipUrlPrefix.Length..];
         var sepIdx = inner.IndexOf(ZipUrlSeparator);
         if (sepIdx < 0)
@@ -229,11 +211,10 @@ public class PayloadManager(GitHubClient github)
             await github.DownloadFileAsync(zipUrl, tempZip, progress, ct);
             using var zip = ZipFile.OpenRead(tempZip);
 
-            // Extract every payload in the archive so sibling payloads are cached too
             foreach (var entry in zip.Entries)
             {
-                if (entry.Length == 0) continue;                        // directory entry
-                if (!GitHubClient.IsPayloadFile(entry.Name)) continue;  // not a payload
+                if (entry.Length == 0) continue;
+                if (!GitHubClient.IsPayloadFile(entry.Name)) continue;
 
                 var entryVersionDir = Path.Combine(AppPaths.CacheDir, entry.Name, version);
                 Directory.CreateDirectory(entryVersionDir);
