@@ -7,29 +7,36 @@ using PS5AutoPayloadTool.Modules.Sources;
 
 namespace PS5AutoPayloadTool.Modules.Payloads;
 
+/// <summary>Single payload entry returned by ScanSourceAsync.</summary>
+public record ScanResult(
+    string  Name,
+    string  DownloadUrl,
+    string  Version,
+    long    Size,
+    string? Hash,
+    string  PublishedAt = "");
+
 public class PayloadManager(GitHubClient github)
 {
     // ZIP-sourced payloads use this URL convention:
     //   zip:{zipBrowserDownloadUrl}|{entryFullName}
-    // so DownloadAsync knows to download the archive and extract the specific entry.
     private const string ZipUrlPrefix    = "zip:";
     private const char   ZipUrlSeparator = '|';
 
     // ── Scan ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Scans a source and returns (name, downloadUrl, version, size, hash?) tuples
-    /// for all payload files found.  ZIP release assets are transparently
-    /// unpacked: every .elf / .bin / .lua inside the archive is returned as
-    /// a separate entry with a <c>zip:</c>-prefixed download URL.
-    /// Hash is the git blob SHA for folder sources; null for release/ZIP sources.
+    /// Scans a source and returns a <see cref="ScanResult"/> for every payload
+    /// file found. ZIP release assets are transparently unpacked: every
+    /// .elf / .bin / .lua inside is returned as a separate entry with a
+    /// <c>zip:</c>-prefixed download URL.
     /// </summary>
-    public async Task<List<(string Name, string DownloadUrl, string Version, long Size, string? Hash)>> ScanSourceAsync(
+    public async Task<List<ScanResult>> ScanSourceAsync(
         SourceConfig source,
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
-        var results = new List<(string, string, string, long, string?)>();
+        var results = new List<ScanResult>();
 
         if (source.Type == "release")
         {
@@ -43,7 +50,9 @@ public class PayloadManager(GitHubClient github)
                     {
                         if (!string.IsNullOrEmpty(source.Filter) &&
                             !MatchFilter(asset.Name, source.Filter)) continue;
-                        results.Add((asset.Name, asset.BrowserDownloadUrl, release.TagName, asset.Size, null));
+                        results.Add(new ScanResult(
+                            asset.Name, asset.BrowserDownloadUrl,
+                            release.TagName, asset.Size, null, release.PublishedAt));
                     }
                     else if (GitHubClient.IsZipFile(asset.Name))
                     {
@@ -58,7 +67,9 @@ public class PayloadManager(GitHubClient github)
                                 if (!string.IsNullOrEmpty(source.Filter) &&
                                     !MatchFilter(entryName, source.Filter)) continue;
                                 var zipUrl = $"{ZipUrlPrefix}{asset.BrowserDownloadUrl}{ZipUrlSeparator}{entryPath}";
-                                results.Add((entryName, zipUrl, release.TagName, entrySize, null));
+                                results.Add(new ScanResult(
+                                    entryName, zipUrl,
+                                    release.TagName, entrySize, null, release.PublishedAt));
                                 anyPayload = true;
                             }
                             if (!anyPayload)
@@ -83,7 +94,8 @@ public class PayloadManager(GitHubClient github)
                 if (!GitHubClient.IsPayloadFile(file.Name)) continue;
                 if (!string.IsNullOrEmpty(source.Filter) &&
                     !MatchFilter(file.Name, source.Filter)) continue;
-                results.Add((file.Name, file.DownloadUrl, "folder", file.Size,
+                results.Add(new ScanResult(
+                    file.Name, file.DownloadUrl, "folder", file.Size,
                     string.IsNullOrEmpty(file.Sha) ? null : file.Sha));
             }
         }
@@ -96,9 +108,6 @@ public class PayloadManager(GitHubClient github)
 
     /// <summary>
     /// Downloads a payload to cache and copies it to the active payloads directory.
-    /// Handles both direct URLs and <c>zip:</c>-prefixed URLs for archive assets.
-    /// When extracting from a ZIP, all payload files in the archive are cached at
-    /// once so sibling payloads don't require a second ZIP download.
     /// </summary>
     public async Task DownloadAsync(
         AppConfig config,
@@ -137,15 +146,18 @@ public class PayloadManager(GitHubClient github)
         if (!meta.Versions.Contains(version))
             meta.Versions.Add(version);
 
-        meta.Version   = version;
-        meta.LocalPath = activePath;
-        meta.SourceUrl = sourceUrl;
-        meta.Size      = new FileInfo(activePath).Length;
-        meta.FileHash  = ComputeSha256(activePath);
+        meta.Version            = version;
+        meta.LocalPath          = activePath;
+        meta.SourceUrl          = sourceUrl;
+        meta.Size               = new FileInfo(activePath).Length;
+        meta.FileHash           = ComputeSha256(activePath);
+        meta.HasUpdateAvailable = false;
+        meta.SourceNotAvailable = false;
     }
 
     /// <summary>
     /// Resolves the download URL by rescanning the source, then delegates to DownloadAsync.
+    /// "latest" / "Latest" always picks the first (most recent) scan result for that name.
     /// </summary>
     public async Task DownloadPayloadAsync(
         AppConfig config,
@@ -160,14 +172,19 @@ public class PayloadManager(GitHubClient github)
             throw new InvalidOperationException($"Source not found for URL: {sourceUrl}");
 
         var found = await ScanSourceAsync(source, null, ct);
-        var match = found.FirstOrDefault(f =>
-            f.Name == name &&
-            (f.Version == version || version == "latest" || source.Type == "folder"));
 
-        if (match == default)
-            throw new InvalidOperationException($"Version '{version}' of '{name}' not found in source.");
+        bool wantLatest = version is "latest" or "Latest";
+        var match = wantLatest
+            ? found.FirstOrDefault(f => f.Name == name)
+            : found.FirstOrDefault(f => f.Name == name &&
+                  (f.Version == version || source.Type == "folder"))
+              ?? found.FirstOrDefault(f => f.Name == name);
 
-        await DownloadAsync(config, name, match.DownloadUrl, version, sourceUrl, progress, ct);
+        if (match == null)
+            throw new InvalidOperationException(
+                $"No valid payload found in release for '{name}'.");
+
+        await DownloadAsync(config, name, match.DownloadUrl, match.Version, sourceUrl, progress, ct);
     }
 
     // ── ZIP helpers ───────────────────────────────────────────────────────────

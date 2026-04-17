@@ -183,11 +183,19 @@ public class PayloadMeta
     [JsonPropertyName("file_hash")]
     public string FileHash { get; set; } = "";
 
+    /// <summary>ISO-8601 published_at timestamp of the latest known release.</summary>
+    [JsonPropertyName("published_at")]
+    public string PublishedAt { get; set; } = "";
+
     [JsonIgnore]
     public bool IsDownloaded => !string.IsNullOrEmpty(LocalPath) && File.Exists(LocalPath);
 
     [JsonIgnore]
     public bool HasUpdateAvailable { get; set; } = false;
+
+    /// <summary>True when the SourceUrl is no longer present in config.Sources.</summary>
+    [JsonIgnore]
+    public bool SourceNotAvailable { get; set; } = false;
 }
 
 public class DeviceConfig

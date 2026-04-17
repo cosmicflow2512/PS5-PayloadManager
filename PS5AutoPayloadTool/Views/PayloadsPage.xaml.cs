@@ -105,6 +105,12 @@ public partial class PayloadsPage : UserControl
         var selectedVersion = entry.SelectedVersion;
         if (string.IsNullOrEmpty(selectedVersion)) return;
 
+        if (entry.SourceNotAvailable)
+        {
+            entry.StatusText = "Source not available — cannot download.";
+            return;
+        }
+
         if (selectedVersion == "local")
         {
             entry.StatusText = "Local payload — nothing to download.";
@@ -171,23 +177,35 @@ public class PayloadEntry : System.ComponentModel.INotifyPropertyChanged
     {
         Name            = name;
         Meta            = meta;
-        SelectedVersion = meta.Version;
+        SelectedVersion = !string.IsNullOrEmpty(meta.SourceUrl) ? "Latest" : meta.Version;
     }
 
-    public string       Name             { get; }
-    public PayloadMeta  Meta             { get; }
-    public List<string> AvailableVersions => Meta.Versions;
-    public string?      CurrentVersion    => Meta.Version;
+    public string      Name { get; }
+    public PayloadMeta Meta { get; }
+
+    public List<string> AvailableVersions
+    {
+        get
+        {
+            var list = new List<string>();
+            if (!string.IsNullOrEmpty(Meta.SourceUrl))
+                list.Add("Latest");
+            list.AddRange(Meta.Versions.Where(v => v != "Latest"));
+            return list;
+        }
+    }
 
     public string CurrentVersionDisplay =>
-        Meta.HasUpdateAvailable
-            ? $"{Meta.Version}  —  Update available"
-            : $"{Meta.Version}  —  Latest";
+        Meta.SourceNotAvailable ? $"{Meta.Version} (Source not available)" :
+        Meta.HasUpdateAvailable ? $"{Meta.Version} (Update available)"     :
+                                  $"{Meta.Version} (Latest)";
 
-    public string SelectedVersion { get; set; }
-    public bool   IsDownloaded    => Meta.IsDownloaded;
-    public bool   HasUpdate       => Meta.HasUpdateAvailable;
-    public string Id              => Name;
+    public string SelectedVersion    { get; set; }
+    public bool   IsDownloaded       => Meta.IsDownloaded;
+    public bool   HasUpdate          => Meta.HasUpdateAvailable && !Meta.SourceNotAvailable;
+    public bool   SourceNotAvailable => Meta.SourceNotAvailable;
+    public bool   IsDownloadEnabled  => !Meta.SourceNotAvailable && Meta.Version != "local";
+    public string Id                 => Name;
 
     private string _statusText = "";
     public string StatusText

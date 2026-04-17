@@ -52,21 +52,12 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Style="{StaticResource Card}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <Grid Grid.Row="0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <!-- ── Main row (all inline) ─────────────── -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
 
                                         <!-- Status dot -->
-                                        <Ellipse Grid.Column="0"
-                                                 Width="8" Height="8"
+                                        <Ellipse Width="8" Height="8"
                                                  Margin="0,0,10,0"
                                                  VerticalAlignment="Center">
                                             <Ellipse.Style>
@@ -79,59 +70,71 @@
                                                         <DataTrigger Binding="{Binding HasUpdate}" Value="True">
                                                             <Setter Property="Fill" Value="{StaticResource Yellow}"/>
                                                         </DataTrigger>
+                                                        <DataTrigger Binding="{Binding SourceNotAvailable}" Value="True">
+                                                            <Setter Property="Fill" Value="{StaticResource FgSubtle}"/>
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </Ellipse.Style>
                                         </Ellipse>
 
-                                        <!-- Info -->
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Name}"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{StaticResource FgMain}"
-                                                       FontSize="13"/>
-                                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                                <TextBlock Text="Current: "
-                                                           Foreground="{StaticResource FgSubtle}"
-                                                           FontSize="11"/>
-                                                <TextBlock Text="{Binding CurrentVersionDisplay}"
-                                                           FontSize="11" FontFamily="Consolas">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Foreground" Value="{StaticResource Green}"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding HasUpdate}" Value="True">
-                                                                    <Setter Property="Foreground" Value="{StaticResource Yellow}"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                            </StackPanel>
-                                        </StackPanel>
+                                        <!-- Filename -->
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource FgMain}"
+                                                   FontSize="13"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,12,0"/>
 
-                                        <!-- Actions -->
-                                        <StackPanel Grid.Column="2"
-                                                    Orientation="Horizontal"
-                                                    VerticalAlignment="Center">
-                                            <ComboBox ItemsSource="{Binding AvailableVersions}"
-                                                      SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
-                                                      Width="120" FontSize="11"
-                                                      Margin="0,0,6,0"/>
-                                            <Button Content="Download"
-                                                    Style="{StaticResource BtnAccent}"
-                                                    Padding="10,4" Margin="0,0,6,0"
-                                                    Click="BtnDownload_Click"/>
-                                            <Button Content="Delete"
-                                                    Style="{StaticResource BtnDanger}"
-                                                    Padding="10,4"
-                                                    Click="BtnDeletePayload_Click"/>
-                                        </StackPanel>
-                                    </Grid>
+                                        <!-- Current: vX.XX (Status) -->
+                                        <TextBlock Text="Current: "
+                                                   Foreground="{StaticResource FgSubtle}"
+                                                   FontSize="11"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding CurrentVersionDisplay}"
+                                                   FontSize="11" FontFamily="Consolas"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,12,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{StaticResource Green}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasUpdate}" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource Yellow}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding SourceNotAvailable}" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource FgSubtle}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
 
-                                    <!-- Status text row -->
-                                    <TextBlock Grid.Row="1"
-                                               Text="{Binding StatusText}"
+                                        <!-- Version dropdown -->
+                                        <ComboBox ItemsSource="{Binding AvailableVersions}"
+                                                  SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
+                                                  Width="120" FontSize="11"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0"/>
+
+                                        <!-- Download -->
+                                        <Button Content="Download"
+                                                Style="{StaticResource BtnAccent}"
+                                                IsEnabled="{Binding IsDownloadEnabled}"
+                                                Padding="10,4" Margin="0,0,6,0"
+                                                VerticalAlignment="Center"
+                                                Click="BtnDownload_Click"/>
+
+                                        <!-- Delete -->
+                                        <Button Content="Delete"
+                                                Style="{StaticResource BtnDanger}"
+                                                Padding="10,4"
+                                                VerticalAlignment="Center"
+                                                Click="BtnDeletePayload_Click"/>
+                                    </StackPanel>
+
+                                    <!-- ── Status text (progress / error) ────── -->
+                                    <TextBlock Text="{Binding StatusText}"
                                                Foreground="{StaticResource FgSubtle}"
                                                FontSize="11" Margin="18,4,0,0">
                                         <TextBlock.Style>
@@ -145,7 +148,7 @@
                                             </Style>
                                         </TextBlock.Style>
                                     </TextBlock>
-                                </Grid>
+                                </StackPanel>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

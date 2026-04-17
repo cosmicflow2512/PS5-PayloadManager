@@ -20,6 +20,9 @@ public class GhRelease
 
     [JsonPropertyName("assets")]
     public List<GhAsset> Assets { get; set; } = new();
+
+    [JsonPropertyName("published_at")]
+    public string PublishedAt { get; set; } = "";
 }
 
 public class GhAsset

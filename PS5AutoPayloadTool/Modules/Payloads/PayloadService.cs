@@ -6,17 +6,12 @@ namespace PS5AutoPayloadTool.Modules.Payloads;
 
 /// <summary>
 /// Manages payload downloads, update detection, and local file operations.
-/// Views delegate all business logic here — no direct filesystem or network
-/// access happens inside UI code-behind.
+/// Views delegate all business logic here.
 /// </summary>
 public class PayloadService(PayloadManager manager)
 {
     // ── Local payload management ─────────────────────────────────────────────
 
-    /// <summary>
-    /// Copies a local file into PayloadsDir and registers it in config.
-    /// Returns the payload filename.
-    /// </summary>
     public string AddLocal(AppConfig config, string filePath)
     {
         var name = Path.GetFileName(filePath);
@@ -43,7 +38,6 @@ public class PayloadService(PayloadManager manager)
         return name;
     }
 
-    /// <summary>Deletes the payload file and removes it from config.</summary>
     public void Delete(AppConfig config, string name)
     {
         var path = Path.Combine(AppPaths.PayloadsDir, name);
@@ -54,9 +48,12 @@ public class PayloadService(PayloadManager manager)
     // ── Update detection ─────────────────────────────────────────────────────
 
     /// <summary>
-    /// Scans all sources in parallel to detect version and hash changes.
-    /// Updates <see cref="PayloadMeta.HasUpdateAvailable"/> for each payload.
-    /// Reports per-source status via <paramref name="progress"/>.
+    /// Scans all sources in parallel.  Detects updates via (in priority order):
+    /// 1. version tag change,
+    /// 2. git blob SHA change (folder sources),
+    /// 3. file size change,
+    /// 4. published_at timestamp newer than local file mtime (release sources).
+    /// Sets HasUpdateAvailable and SourceNotAvailable on each PayloadMeta.
     /// </summary>
     public async Task CheckUpdatesAsync(
         AppConfig config,
@@ -68,24 +65,50 @@ public class PayloadService(PayloadManager manager)
             try
             {
                 var found = await manager.ScanSourceAsync(source, null, ct);
-                foreach (var (name, _, version, size, remoteHash) in found)
+                foreach (var r in found)
                 {
-                    if (!config.PayloadMeta.ContainsKey(name))
+                    if (!config.PayloadMeta.ContainsKey(r.Name))
                     {
-                        config.PayloadMeta[name] = new PayloadMeta
-                            { SourceUrl = source.Url, Versions = new() { version }, Version = version, Size = size };
+                        config.PayloadMeta[r.Name] = new PayloadMeta
+                        {
+                            SourceUrl   = source.Url,
+                            Versions    = new() { r.Version },
+                            Version     = r.Version,
+                            Size        = r.Size,
+                            PublishedAt = r.PublishedAt
+                        };
+                        continue;
                     }
-                    else
-                    {
-                        var meta = config.PayloadMeta[name];
-                        if (!meta.Versions.Contains(version)) meta.Versions.Add(version);
 
-                        bool versionChanged = version != "folder" && meta.Version != version;
-                        bool hashChanged    = remoteHash != null
-                                           && !string.IsNullOrEmpty(meta.FileHash)
-                                           && remoteHash != meta.FileHash;
-                        meta.HasUpdateAvailable = versionChanged || hashChanged;
+                    var meta = config.PayloadMeta[r.Name];
+                    if (!meta.Versions.Contains(r.Version)) meta.Versions.Add(r.Version);
+                    if (!string.IsNullOrEmpty(r.PublishedAt)) meta.PublishedAt = r.PublishedAt;
+
+                    bool versionChanged = r.Version != "folder" && meta.Version != r.Version;
+                    bool hashChanged    = r.Hash != null
+                                      && !string.IsNullOrEmpty(meta.FileHash)
+                                      && r.Hash != meta.FileHash;
+                    bool sizeChanged    = !versionChanged
+                                      && r.Size > 0 && meta.Size > 0
+                                      && r.Size != meta.Size;
+                    bool timestampNewer = false;
+
+                    if (!versionChanged && !hashChanged && !sizeChanged
+                        && !string.IsNullOrEmpty(r.PublishedAt)
+                        && File.Exists(meta.LocalPath))
+                    {
+                        if (DateTime.TryParse(r.PublishedAt, null,
+                                System.Globalization.DateTimeStyles.RoundtripKind,
+                                out var remoteDate))
+                        {
+                            var localMtime = File.GetLastWriteTimeUtc(meta.LocalPath);
+                            // 60-second tolerance to ignore minor clock drift
+                            timestampNewer = remoteDate.ToUniversalTime() > localMtime.AddSeconds(60);
+                        }
                     }
+
+                    meta.SourceNotAvailable = false;
+                    meta.HasUpdateAvailable = versionChanged || hashChanged || sizeChanged || timestampNewer;
                 }
                 progress?.Report($"Checked {source.DisplayName}.");
             }
@@ -96,13 +119,24 @@ public class PayloadService(PayloadManager manager)
         }, ct)).ToList();
 
         await Task.WhenAll(tasks);
+
+        // Mark payloads whose source URL is no longer in config
+        foreach (var (_, meta) in config.PayloadMeta)
+        {
+            if (!string.IsNullOrEmpty(meta.SourceUrl)
+                && !config.Sources.Any(s => s.Url == meta.SourceUrl))
+            {
+                meta.SourceNotAvailable = true;
+                meta.HasUpdateAvailable = false;
+            }
+        }
     }
 
     // ── Targeted download ────────────────────────────────────────────────────
 
     /// <summary>
-    /// Downloads a specific version of a payload from its registered source.
-    /// Returns null on success, or an error message on failure.
+    /// Downloads a specific version ("Latest" picks the newest) from the
+    /// payload's registered source.  Returns null on success, error string on failure.
     /// </summary>
     public async Task<string?> DownloadVersionAsync(
         AppConfig config,
@@ -115,14 +149,28 @@ public class PayloadService(PayloadManager manager)
         try
         {
             var source = config.Sources.FirstOrDefault(s => s.Url == sourceUrl);
-            if (source == null) return "Source not found.";
+            if (source == null)
+            {
+                if (config.PayloadMeta.TryGetValue(name, out var m))
+                {
+                    m.SourceNotAvailable = true;
+                    m.HasUpdateAvailable = false;
+                }
+                return "Source not available.";
+            }
 
             var found = await manager.ScanSourceAsync(source, null, ct);
-            var match = found.FirstOrDefault(f => f.Name == name && f.Version == version);
-            if (match == default) return "Version not found in source.";
+
+            bool wantLatest = version is "Latest" or "latest";
+            var match = wantLatest
+                ? found.FirstOrDefault(f => f.Name == name)
+                : found.FirstOrDefault(f => f.Name == name && f.Version == version)
+                  ?? found.FirstOrDefault(f => f.Name == name);
+
+            if (match == null) return "No valid payload found in release.";
 
             await manager.DownloadAsync(
-                config, name, match.DownloadUrl, version, sourceUrl, progress, ct);
+                config, name, match.DownloadUrl, match.Version, sourceUrl, progress, ct);
             return null;
         }
         catch (Exception ex) { return ex.Message; }
@@ -130,11 +178,6 @@ public class PayloadService(PayloadManager manager)
 
     // ── Bulk update ──────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Scans each payload's source for the latest version and downloads it.
-    /// Reports (payloadName, successFlag, message) per payload via the return value.
-    /// Progress callback receives (payloadName, percentComplete).
-    /// </summary>
     public async Task<List<(string Name, bool Success, string Message)>> UpdateAllAsync(
         AppConfig config,
         IProgress<(string Name, double Pct)>? progress = null,
@@ -158,12 +201,12 @@ public class PayloadService(PayloadManager manager)
             {
                 var found  = await manager.ScanSourceAsync(source, null, ct);
                 var latest = found.FirstOrDefault(f => f.Name == name);
-                if (latest == default) continue;
+                if (latest == null) continue;
 
                 await manager.DownloadAsync(
                     config, name, latest.DownloadUrl, latest.Version, source.Url, null, ct);
 
-                meta.Version           = latest.Version;
+                meta.Version            = latest.Version;
                 meta.HasUpdateAvailable = false;
                 results.Add((name, true, $"Updated to {latest.Version}"));
             }
@@ -179,11 +222,6 @@ public class PayloadService(PayloadManager manager)
 
     // ── Post-import resolution ───────────────────────────────────────────────
 
-    /// <summary>
-    /// After a config import, downloads any payloads whose local files are absent.
-    /// Skips entries in <paramref name="alreadyRestored"/> (extracted from backup ZIP).
-    /// Progress reports (payloadName, logMessage, percentComplete).
-    /// </summary>
     public async Task ResolveAfterImportAsync(
         AppConfig config,
         HashSet<string> alreadyRestored,
@@ -202,7 +240,6 @@ public class PayloadService(PayloadManager manager)
             var (name, meta) = missing[i];
             double pct = (double)(i + 1) / missing.Count * 100;
 
-            // Re-check: may have been populated as a sibling of another ZIP payload
             var localFile = Path.Combine(AppPaths.PayloadsDir, name);
             if (File.Exists(localFile))
             {
@@ -220,6 +257,7 @@ public class PayloadService(PayloadManager manager)
             var source = config.Sources.FirstOrDefault(s => s.Url == meta.SourceUrl);
             if (source == null)
             {
+                meta.SourceNotAvailable = true;
                 progress?.Report((name, $"{name}: source not in config — skipped.", pct));
                 continue;
             }
@@ -227,11 +265,10 @@ public class PayloadService(PayloadManager manager)
             try
             {
                 var found = await manager.ScanSourceAsync(source, null, ct);
-                var match = found.FirstOrDefault(f => f.Name == name && f.Version == meta.Version);
-                if (match == default)
-                    match = found.FirstOrDefault(f => f.Name == name);
+                var match = found.FirstOrDefault(f => f.Name == name && f.Version == meta.Version)
+                         ?? found.FirstOrDefault(f => f.Name == name);
 
-                if (match == default)
+                if (match == null)
                 {
                     progress?.Report((name, $"{name}: not found in source — skipped.", pct));
                     continue;
