@@ -53,11 +53,12 @@ jobs:
           retention-days: 30
 
       - name: Upload to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name || github.ref_name }}
-          name: PS5 AutoPayload Tool ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name || github.ref_name }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name || 'latest') }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('PS5 AutoPayload Tool {0}', github.ref_name) || (github.event_name == 'workflow_dispatch' && format('PS5 AutoPayload Tool {0}', github.event.inputs.tag_name) || 'PS5 AutoPayload Tool (latest)') }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
           body: |
             ## PS5 AutoPayload Tool
 
