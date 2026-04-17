@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Threading;
 using PS5AutoPayloadTool.Modules.Core;
@@ -22,10 +23,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            MessageBox.Show(
-                $"Startup failed during initialisation:\n\n{ex.GetType().Name}: {ex.Message}\n\n{ex.StackTrace}",
-                "PS5 AutoPayload Tool — Startup Error",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            ShowError("PS5 AutoPayload Tool — Startup Error", ex);
             Shutdown(1);
             return;
         }
@@ -43,28 +41,69 @@ public partial class App : Application
 
     private static void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        LogService.Error("App", $"Unhandled UI exception: {e.Exception.Message}\n{e.Exception.StackTrace}");
-        MessageBox.Show(
-            $"An unexpected error occurred:\n\n{e.Exception.Message}\n\n{e.Exception.StackTrace}",
-            "PS5 AutoPayload Tool — Error",
-            MessageBoxButton.OK, MessageBoxImage.Error);
+        try { LogService.Error("App", $"Unhandled UI exception: {e.Exception}"); } catch { }
+        ShowError("PS5 AutoPayload Tool — Error", e.Exception);
         e.Handled = true;
     }
 
     private static void OnDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
         var ex = e.ExceptionObject as Exception;
-        var msg = ex != null ? $"{ex.GetType().Name}: {ex.Message}\n\n{ex.StackTrace}" : e.ExceptionObject?.ToString();
-        try { LogService.Error("App", $"Fatal domain exception: {msg}"); } catch { }
-        MessageBox.Show(
-            $"A fatal error occurred and the application must close:\n\n{msg}",
-            "PS5 AutoPayload Tool — Fatal Error",
-            MessageBoxButton.OK, MessageBoxImage.Error);
+        try { LogService.Error("App", $"Fatal domain exception: {ex}"); } catch { }
+        if (ex != null)
+            ShowError("PS5 AutoPayload Tool — Fatal Error", ex);
+        else
+            MessageBox.Show(e.ExceptionObject?.ToString(), "PS5 AutoPayload Tool — Fatal Error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
     }
 
     private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
-        LogService.Error("App", $"Unobserved task exception: {e.Exception.Message}");
+        try { LogService.Error("App", $"Unobserved task exception: {e.Exception.Message}"); } catch { }
         e.SetObserved();
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Unwraps TargetInvocationException / AggregateException chains to expose
+    /// the real root cause, writes it to a fallback file, then shows a dialog.
+    /// </summary>
+    private static void ShowError(string title, Exception outer)
+    {
+        var root = Unwrap(outer);
+
+        // Build a readable message: root cause first, then full chain.
+        var text =
+            $"Root cause:\n{root.GetType().Name}: {root.Message}\n\n" +
+            $"Stack trace:\n{root.StackTrace}";
+
+        if (root != outer)
+            text += $"\n\nFull exception chain:\n{outer}";
+
+        // Write to fallback file in case this is a startup crash and the log
+        // file hasn't been opened yet.
+        try
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "PS5Autopayload");
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "startup-error.txt"),
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {title}\n\n{text}\n");
+        }
+        catch { }
+
+        MessageBox.Show(text, title, MessageBoxButton.OK, MessageBoxImage.Error);
+    }
+
+    /// <summary>Unwraps TargetInvocationException and single-inner AggregateException.</summary>
+    private static Exception Unwrap(Exception ex)
+    {
+        while (ex.InnerException != null &&
+               (ex is TargetInvocationException ||
+                ex is AggregateException ae && ae.InnerExceptions.Count == 1))
+            ex = ex.InnerException;
+        return ex;
     }
 }
