@@ -84,13 +84,13 @@ public class SourceService(GitHubClient github, PayloadManager payloads)
         {
             var found = await payloads.ScanSourceAsync(source, progress, ct);
 
-            foreach (var (name, _, version, size, _) in found)
+            foreach (var r in found)
             {
-                if (!config.PayloadMeta.ContainsKey(name))
-                    config.PayloadMeta[name] = new PayloadMeta
-                        { SourceUrl = source.Url, Versions = new() { version }, Version = version, Size = size };
-                else if (!config.PayloadMeta[name].Versions.Contains(version))
-                    config.PayloadMeta[name].Versions.Add(version);
+                if (!config.PayloadMeta.ContainsKey(r.Name))
+                    config.PayloadMeta[r.Name] = new PayloadMeta
+                        { SourceUrl = source.Url, Versions = new() { r.Version }, Version = r.Version, Size = r.Size };
+                else if (!config.PayloadMeta[r.Name].Versions.Contains(r.Version))
+                    config.PayloadMeta[r.Name].Versions.Add(r.Version);
             }
 
             return (found.Count, null);
