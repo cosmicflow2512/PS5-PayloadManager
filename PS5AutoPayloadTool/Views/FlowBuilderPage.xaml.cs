@@ -179,8 +179,21 @@ public partial class FlowBuilderPage : UserControl
         if (cb.DataContext is BuilderStep step && cb.SelectedItem is string name)
         {
             step.Port = PayloadSender.GetDefaultPort(name, MainWindow.Config.Ports);
+            // Reset version selection to Latest when payload changes
+            step.SelectedVersion = "Latest";
             UpdateCompatibilityBadge();
             UpdateVersionLabels();
+            SyncFlowToConfig();
+        }
+    }
+
+    private void CmbStepVersion_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        if (sender is not ComboBox cb) return;
+        if (cb.DataContext is BuilderStep step && cb.SelectedItem is string version)
+        {
+            step.SelectedVersion = version;
             SyncFlowToConfig();
         }
     }
@@ -252,7 +265,7 @@ public partial class FlowBuilderPage : UserControl
 
     // ── Export Autoload ZIP ───────────────────────────────────────────────────
 
-    private void BtnExportZip_Click(object sender, RoutedEventArgs e)
+    private async void BtnExportZip_Click(object sender, RoutedEventArgs e)
     {
         if (_steps.Count == 0) { AppendLog("Flow is empty — nothing to export."); return; }
 
@@ -297,6 +310,48 @@ public partial class FlowBuilderPage : UserControl
             return;
         }
 
+        // ── Auto-download any missing payload files ──────────────────────────
+        var exportBtn = sender as Button;
+        if (exportBtn != null) exportBtn.IsEnabled = false;
+        try
+        {
+            foreach (var step in elfSteps)
+            {
+                var activeSrc = Path.Combine(AppPaths.PayloadsDir, step.Payload);
+                if (File.Exists(activeSrc)) continue;
+
+                if (!MainWindow.Config.PayloadMeta.TryGetValue(step.Payload, out var meta)
+                    || string.IsNullOrEmpty(meta.SourceUrl))
+                {
+                    AppendLog($"Warning: {step.Payload} has no source configured — cannot auto-download.");
+                    continue;
+                }
+
+                var targetVersion = (!string.IsNullOrEmpty(step.SelectedVersion)
+                                     && step.SelectedVersion != "Latest")
+                    ? step.SelectedVersion
+                    : "latest";
+
+                AppendLog($"Downloading {step.Payload} ({targetVersion})…");
+                try
+                {
+                    await MainWindow.PayloadMgr.DownloadPayloadAsync(
+                        MainWindow.Config, step.Payload, targetVersion, meta.SourceUrl);
+                    MainWindow.SaveConfig();
+                    AppendLog($"  ✓ {step.Payload} ready.");
+                }
+                catch (Exception ex)
+                {
+                    AppendLog($"  ✗ Download failed for {step.Payload}: {ex.Message}");
+                }
+            }
+        }
+        finally
+        {
+            if (exportBtn != null) exportBtn.IsEnabled = true;
+        }
+
+        // ── Build autoload.txt content ───────────────────────────────────────
         var sb = new StringBuilder();
         foreach (var step in _steps)
         {
@@ -323,13 +378,15 @@ public partial class FlowBuilderPage : UserControl
             using (var writer = new StreamWriter(txtEntry.Open()))
                 writer.Write(sb.ToString());
 
-            int copied = 0;
+            int copied = 0, skipped = 0;
             foreach (var step in elfSteps)
             {
-                var src = Path.Combine(AppPaths.PayloadsDir, step.Payload);
-                if (!File.Exists(src))
+                // Prefer the version-specific cache file; fall back to active payload
+                var src = ResolvePayloadPath(step);
+                if (src == null)
                 {
-                    AppendLog($"Warning: {step.Payload} not downloaded — skipped in ZIP.");
+                    AppendLog($"Warning: {step.Payload} not available — skipped in ZIP.");
+                    skipped++;
                     continue;
                 }
                 var fileEntry = zip.CreateEntry($"ps5_autoloader/{step.Payload}");
@@ -339,12 +396,32 @@ public partial class FlowBuilderPage : UserControl
                 copied++;
             }
 
-            AppendLog($"Exported: {Path.GetFileName(dlg.FileName)}  ({copied} payload(s), autoload.txt)");
+            var skipNote = skipped > 0 ? $", {skipped} skipped" : "";
+            AppendLog($"Exported: {Path.GetFileName(dlg.FileName)}  ({copied} payload(s){skipNote}, autoload.txt)");
         }
         catch (Exception ex)
         {
             AppendLog($"Export error: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Returns the best available local path for a payload step.
+    /// For a specific (non-Latest) version, checks the version cache first.
+    /// Falls back to the active payloads directory.
+    /// Returns null if the file is not available locally.
+    /// </summary>
+    private static string? ResolvePayloadPath(BuilderStep step)
+    {
+        if (!string.IsNullOrEmpty(step.SelectedVersion) && step.SelectedVersion != "Latest")
+        {
+            var cachePath = Path.Combine(AppPaths.CacheDir, step.Payload,
+                                         step.SelectedVersion, step.Payload);
+            if (File.Exists(cachePath)) return cachePath;
+        }
+
+        var activePath = Path.Combine(AppPaths.PayloadsDir, step.Payload);
+        return File.Exists(activePath) ? activePath : null;
     }
 
     // ── Run / Stop ───────────────────────────────────────────────────────────
@@ -400,8 +477,8 @@ public partial class FlowBuilderPage : UserControl
     }
 
     /// <summary>
-    /// Refreshes the VersionLabel on every payload step so the badge next to
-    /// the ComboBox stays current (e.g. "(Latest)" or "(v1.03)").
+    /// Refreshes VersionOptions and VersionLabel on every payload step.
+    /// Populates the version ComboBox items and keeps the version badge current.
     /// </summary>
     private void UpdateVersionLabels()
     {
@@ -409,19 +486,36 @@ public partial class FlowBuilderPage : UserControl
         {
             if (step.Type != "payload" || string.IsNullOrEmpty(step.Payload))
             {
-                step.VersionLabel = "";
+                step.VersionLabel   = "";
+                step.VersionOptions = new List<string> { "Latest" };
                 continue;
             }
 
             if (MainWindow.Config.PayloadMeta.TryGetValue(step.Payload, out var meta)
                 && !string.IsNullOrEmpty(meta.Version))
             {
-                var isLatest = meta.Versions.Count > 0 && meta.Versions[0] == meta.Version;
-                step.VersionLabel = isLatest ? "(Latest)" : $"({meta.Version})";
+                // Build version dropdown: "Latest" + all known versions
+                var opts = new List<string> { "Latest" };
+                foreach (var v in meta.Versions)
+                    if (v != "folder" && !opts.Contains(v))
+                        opts.Add(v);
+                step.VersionOptions = opts;
+
+                // Ensure SelectedVersion is still a valid option; fall back to Latest
+                if (!opts.Contains(step.SelectedVersion))
+                    step.SelectedVersion = "Latest";
+
+                // Resolve which actual version will be used
+                var effective = step.SelectedVersion == "Latest"
+                    ? (meta.Versions.Count > 0 ? meta.Versions[0] : meta.Version)
+                    : step.SelectedVersion;
+
+                step.VersionLabel = $"({effective})";
             }
             else
             {
-                step.VersionLabel = "";
+                step.VersionLabel   = "";
+                step.VersionOptions = new List<string> { "Latest" };
             }
         }
     }
