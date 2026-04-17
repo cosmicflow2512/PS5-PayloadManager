@@ -81,4 +81,3 @@ jobs:
             ```
           files: publish\PS5AutoPayloadTool-win-x64.exe
           draft: false
-          prerelease: false
