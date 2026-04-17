@@ -1,5 +1,5 @@
 using System.Windows;
-using PS5AutoPayloadTool.Core;
+using PS5AutoPayloadTool.Modules.Core;
 
 namespace PS5AutoPayloadTool;
 
