@@ -42,8 +42,8 @@ public partial class LogsPage : UserControl
 
     private void ScrollToBottom()
     {
-        if (_displayed.Count > 0)
-            LogList.ScrollIntoView(_displayed[^1]);
+        if (LogList == null || _displayed.Count == 0) return;
+        LogList.ScrollIntoView(_displayed[^1]);
     }
 
     // ── Filter ────────────────────────────────────────────────────────────────
