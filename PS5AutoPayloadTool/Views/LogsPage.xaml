@@ -1,0 +1,141 @@
+<UserControl x:Class="PS5AutoPayloadTool.Views.LogsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ── Toolbar ──────────────────────────────────────────────────── -->
+        <Grid Grid.Row="0" Margin="24,20,24,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Logs"
+                           Style="{StaticResource PageTitle}"
+                           VerticalAlignment="Center" Margin="0,0,20,0"/>
+                <TextBlock Text="Filter:"
+                           Foreground="{StaticResource FgSubtle}"
+                           FontSize="12" VerticalAlignment="Center"
+                           Margin="0,0,6,0"/>
+                <ComboBox x:Name="CmbFilter"
+                          Width="90" FontSize="11"
+                          SelectionChanged="CmbFilter_SelectionChanged">
+                    <ComboBoxItem Content="All"    IsSelected="True"/>
+                    <ComboBoxItem Content="INFO+"/>
+                    <ComboBoxItem Content="WARN+"/>
+                    <ComboBoxItem Content="ERROR"/>
+                </ComboBox>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="Clear"
+                        Style="{StaticResource Btn}"
+                        Margin="0,0,6,0"
+                        Click="BtnClear_Click"/>
+                <Button Content="Copy All"
+                        Style="{StaticResource Btn}"
+                        Margin="0,0,6,0"
+                        Click="BtnCopy_Click"/>
+                <Button Content="Export .txt"
+                        Style="{StaticResource Btn}"
+                        Click="BtnExport_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ── Log list ─────────────────────────────────────────────────── -->
+        <Border Grid.Row="1"
+                Margin="24,0,24,20"
+                Background="{StaticResource BgMantle}"
+                BorderBrush="{StaticResource BgSurface}"
+                BorderThickness="1"
+                CornerRadius="8">
+            <ListBox x:Name="LogList"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     FontFamily="Consolas"
+                     FontSize="11"
+                     Padding="8"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.VirtualizationMode="Recycling"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding"            Value="2,1"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Background"         Value="Transparent"/>
+                        <Setter Property="BorderThickness"    Value="0"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter Margin="{TemplateBinding Padding}"/>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Time -->
+                            <TextBlock Text="{Binding TimeStr}"
+                                       Foreground="{StaticResource FgSubtle}"
+                                       Margin="0,0,8,0"/>
+                            <!-- Level badge -->
+                            <TextBlock Width="40">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text"       Value="{Binding LevelStr}"/>
+                                        <Setter Property="Foreground" Value="{StaticResource FgSubtle}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Level}" Value="INFO">
+                                                <Setter Property="Foreground" Value="{StaticResource FgMain}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Level}" Value="WARN">
+                                                <Setter Property="Foreground" Value="{StaticResource Yellow}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Level}" Value="ERROR">
+                                                <Setter Property="Foreground" Value="#F38BA8"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <!-- Module -->
+                            <TextBlock Text="{Binding Module}"
+                                       Foreground="{StaticResource Accent}"
+                                       Width="140"
+                                       Margin="0,0,8,0"/>
+                            <!-- Message -->
+                            <TextBlock Text="{Binding Message}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource FgMain}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Level}" Value="DEBUG">
+                                                <Setter Property="Foreground" Value="{StaticResource FgSubtle}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Level}" Value="WARN">
+                                                <Setter Property="Foreground" Value="{StaticResource Yellow}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Level}" Value="ERROR">
+                                                <Setter Property="Foreground" Value="#F38BA8"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+    </Grid>
+
+</UserControl>

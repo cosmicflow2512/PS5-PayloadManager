@@ -1,0 +1,93 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - '*'
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to upload to (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Windows EXE
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish single-file EXE
+        run: |
+          dotnet publish PS5AutoPayloadTool/PS5AutoPayloadTool.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -o publish/
+
+      - name: Rename output
+        run: |
+          Rename-Item publish\PS5AutoPayloadTool.exe PS5PayloadManager-win-x64.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS5PayloadManager-win-x64
+          path: publish\PS5PayloadManager-win-x64.exe
+          retention-days: 30
+
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name || 'latest') }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('PS5 PayloadManager {0}', github.ref_name) || (github.event_name == 'workflow_dispatch' && format('PS5 PayloadManager {0}', github.event.inputs.tag_name) || 'PS5 PayloadManager (latest build)') }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          body: |
+            ## PS5 PayloadManager
+
+            Windows desktop app for managing, updating, and deploying PS5 payloads — over the network and via USB autoload.
+
+            ### Download
+            Download `PS5PayloadManager-win-x64.exe` below — no installer required, self-contained single file.
+
+            ### First Run
+            Data is stored automatically in:
+            ```
+            %LOCALAPPDATA%\PS5Autopayload\
+            ```
+
+            ### Autoload Format (USB)
+            ```
+            kstuff.elf
+            !5000
+            shadowmount.elf
+            ```
+
+            ### Profile / Network Execution Syntax
+            ```
+            payload.elf 9021    # send to port 9021
+            payload.lua 9026    # send to port 9026
+            !500                # delay 500 ms
+            ?9021 60 500        # wait for port 9021 (60s timeout, 500ms interval)
+            ```
+
+            See the [README](https://github.com/cosmicflow2512/PS5AutoPayloadTool#readme) for full documentation.
+          files: publish\PS5PayloadManager-win-x64.exe
+          draft: false
