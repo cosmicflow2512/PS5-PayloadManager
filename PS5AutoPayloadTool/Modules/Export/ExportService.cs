@@ -12,25 +12,15 @@ public record ExportResult(int Copied, int Skipped, string? Error = null);
 
 /// <summary>
 /// Creates PS5 autoload ZIP archives from a builder flow.
-/// Automatically downloads any missing payload files before packaging,
-/// so the ZIP export never silently skips a payload.
-/// Views supply only the file path and step list — all I/O is handled here.
+/// For remote payloads, downloads any missing files before packaging.
+/// For local payloads (no SourceUrl / version == "local"), resolves directly
+/// from PayloadsDir or meta.LocalPath — never attempts a network download.
+/// Export is blocked (returns an error) if any required payload file is missing.
 /// </summary>
 public class ExportService(PayloadManager manager)
 {
     // ── Public API ───────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Exports a PS5 autoload ZIP to <paramref name="filePath"/>.
-    /// <list type="bullet">
-    ///   <item>Downloads any missing payload files first (using the step's
-    ///         <see cref="BuilderStep.SelectedVersion"/> or "latest").</item>
-    ///   <item>Writes <c>ps5_autoloader/autoload.txt</c> from <paramref name="autoloadTxt"/>.</item>
-    ///   <item>Copies each ELF/BIN payload into <c>ps5_autoloader/</c>.</item>
-    /// </list>
-    /// Progress messages are reported via <paramref name="progress"/>.
-    /// Returns an <see cref="ExportResult"/> describing the outcome.
-    /// </summary>
     public async Task<ExportResult> ExportAutoloadZipAsync(
         string filePath,
         string autoloadTxt,
@@ -42,7 +32,10 @@ public class ExportService(PayloadManager manager)
         var steps = elfSteps.ToList();
         Log.Info("ExportService", $"Export started: {Path.GetFileName(filePath)}  ({steps.Count} step(s))");
 
-        await EnsurePayloadsDownloadedAsync(steps, config, progress, ct);
+        // Pre-download any missing remote payloads
+        var downloadError = await EnsurePayloadsDownloadedAsync(steps, config, progress, ct);
+        if (downloadError != null)
+            return new ExportResult(0, 0, downloadError);
 
         try
         {
@@ -52,28 +45,34 @@ public class ExportService(PayloadManager manager)
             using (var writer = new StreamWriter(txtEntry.Open()))
                 writer.Write(autoloadTxt);
 
-            int copied = 0, skipped = 0;
+            int copied = 0;
+            var addedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var step in steps)
             {
-                var src = ResolvePayloadPath(step);
+                // Deduplicate: same filename across multiple steps → include only once
+                if (addedNames.Contains(step.Payload))
+                    continue;
+
+                var src = ResolvePayloadPath(step, config);
                 if (src == null)
                 {
-                    Log.Warn("ExportService", $"Skipped: {step.Payload} not available locally");
-                    progress?.Report($"Warning: {step.Payload} not available — skipped in ZIP.");
-                    skipped++;
-                    continue;
+                    var msg = $"Export blocked: {step.Payload} could not be found locally.";
+                    Log.Error("ExportService", msg);
+                    return new ExportResult(0, 0, msg);
                 }
 
                 var entry = zip.CreateEntry($"ps5_autoloader/{step.Payload}");
                 using var dest      = entry.Open();
                 using var srcStream = File.OpenRead(src);
                 srcStream.CopyTo(dest);
+                addedNames.Add(step.Payload);
                 Log.Debug("ExportService", $"  Added: {step.Payload}");
                 copied++;
             }
 
-            Log.Info("ExportService", $"Export complete: {copied} payload(s) copied, {skipped} skipped");
-            return new ExportResult(copied, skipped);
+            Log.Info("ExportService", $"Export complete: {copied} payload(s) copied");
+            return new ExportResult(copied, 0);
         }
         catch (Exception ex)
         {
@@ -85,10 +84,12 @@ public class ExportService(PayloadManager manager)
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// For each step whose payload file is absent from PayloadsDir,
-    /// attempts to download it from the registered source.
+    /// For remote payloads whose file is absent, attempts to download.
+    /// Local payloads (no SourceUrl or version == "local") are skipped — their
+    /// path is resolved later in <see cref="ResolvePayloadPath"/>.
+    /// Returns a blocking error string if a remote download fails; null on success.
     /// </summary>
-    private async Task EnsurePayloadsDownloadedAsync(
+    private async Task<string?> EnsurePayloadsDownloadedAsync(
         IEnumerable<BuilderStep> steps,
         AppConfig config,
         IProgress<string>? progress,
@@ -96,15 +97,23 @@ public class ExportService(PayloadManager manager)
     {
         foreach (var step in steps)
         {
+            if (!config.PayloadMeta.TryGetValue(step.Payload, out var meta))
+                continue;
+
+            // Local payloads — nothing to download; resolve path later
+            bool isLocal = string.IsNullOrEmpty(meta.SourceUrl) || meta.Version == "local";
+            if (isLocal) continue;
+
+            // Already present in PayloadsDir?
             var activeSrc = Path.Combine(AppPaths.PayloadsDir, step.Payload);
             if (File.Exists(activeSrc)) continue;
 
-            if (!config.PayloadMeta.TryGetValue(step.Payload, out var meta)
-                || string.IsNullOrEmpty(meta.SourceUrl))
+            // Check version cache for a pinned version
+            if (!string.IsNullOrEmpty(step.SelectedVersion) && step.SelectedVersion != "Latest")
             {
-                progress?.Report(
-                    $"Warning: {step.Payload} has no source configured — cannot auto-download.");
-                continue;
+                var cachePath = Path.Combine(
+                    AppPaths.CacheDir, step.Payload, step.SelectedVersion, step.Payload);
+                if (File.Exists(cachePath)) continue;
             }
 
             var targetVersion =
@@ -121,18 +130,19 @@ public class ExportService(PayloadManager manager)
             }
             catch (Exception ex)
             {
-                progress?.Report($"  ✗ Download failed for {step.Payload}: {ex.Message}");
+                return $"Download failed for {step.Payload}: {ex.Message}";
             }
         }
+
+        return null;
     }
 
     /// <summary>
     /// Resolves the best available local path for a payload step.
-    /// For a pinned (non-Latest) version, checks the version cache first.
-    /// Falls back to the active payloads directory.
+    /// Order: version cache → PayloadsDir → meta.LocalPath (for local uploads).
     /// Returns null when the file is not available at all.
     /// </summary>
-    private static string? ResolvePayloadPath(BuilderStep step)
+    private static string? ResolvePayloadPath(BuilderStep step, AppConfig config)
     {
         if (!string.IsNullOrEmpty(step.SelectedVersion) && step.SelectedVersion != "Latest")
         {
@@ -142,6 +152,14 @@ public class ExportService(PayloadManager manager)
         }
 
         var activePath = Path.Combine(AppPaths.PayloadsDir, step.Payload);
-        return File.Exists(activePath) ? activePath : null;
+        if (File.Exists(activePath)) return activePath;
+
+        // Fallback: local-upload path stored in meta
+        if (config.PayloadMeta.TryGetValue(step.Payload, out var meta)
+            && !string.IsNullOrEmpty(meta.LocalPath)
+            && File.Exists(meta.LocalPath))
+            return meta.LocalPath;
+
+        return null;
     }
 }
