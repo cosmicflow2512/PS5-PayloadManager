@@ -53,90 +53,91 @@
                         <DataTemplate>
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
-                                    <!-- ── Main row (all inline) ─────────────── -->
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <!-- ── Main row: left info / right controls ── -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
 
-                                        <!-- Status dot -->
-                                        <Ellipse Width="8" Height="8"
-                                                 Margin="0,0,10,0"
-                                                 VerticalAlignment="Center">
-                                            <Ellipse.Style>
-                                                <Style TargetType="Ellipse">
-                                                    <Setter Property="Fill" Value="{StaticResource BgOverlay}"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsDownloaded}" Value="True">
-                                                            <Setter Property="Fill" Value="{StaticResource Green}"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding HasUpdate}" Value="True">
-                                                            <Setter Property="Fill" Value="{StaticResource Yellow}"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding SourceNotAvailable}" Value="True">
-                                                            <Setter Property="Fill" Value="{StaticResource FgSubtle}"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Ellipse.Style>
-                                        </Ellipse>
+                                        <!-- LEFT: status dot + name/version stacked -->
+                                        <StackPanel Grid.Column="0"
+                                                    Orientation="Horizontal"
+                                                    VerticalAlignment="Center">
+                                            <Ellipse Width="8" Height="8"
+                                                     Margin="0,0,10,0"
+                                                     VerticalAlignment="Center">
+                                                <Ellipse.Style>
+                                                    <Style TargetType="Ellipse">
+                                                        <Setter Property="Fill" Value="{StaticResource BgOverlay}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsDownloaded}" Value="True">
+                                                                <Setter Property="Fill" Value="{StaticResource Green}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding HasUpdate}" Value="True">
+                                                                <Setter Property="Fill" Value="{StaticResource Yellow}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding SourceNotAvailable}" Value="True">
+                                                                <Setter Property="Fill" Value="{StaticResource FgSubtle}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Ellipse.Style>
+                                            </Ellipse>
 
-                                        <!-- Filename -->
-                                        <TextBlock Text="{Binding Name}"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource FgMain}"
-                                                   FontSize="13"
-                                                   VerticalAlignment="Center"
-                                                   Margin="0,0,12,0"/>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource FgMain}"
+                                                           FontSize="13"/>
+                                                <TextBlock FontSize="11"
+                                                           FontFamily="Consolas"
+                                                           Margin="0,2,0,0">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text"       Value="{Binding CurrentVersionDisplay}"/>
+                                                            <Setter Property="Foreground" Value="{StaticResource Green}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HasUpdate}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{StaticResource Yellow}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding SourceNotAvailable}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{StaticResource FgSubtle}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </StackPanel>
 
-                                        <!-- Current: vX.XX (Status) -->
-                                        <TextBlock Text="Current: "
-                                                   Foreground="{StaticResource FgSubtle}"
-                                                   FontSize="11"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding CurrentVersionDisplay}"
-                                                   FontSize="11" FontFamily="Consolas"
-                                                   VerticalAlignment="Center"
-                                                   Margin="0,0,12,0">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Foreground" Value="{StaticResource Green}"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasUpdate}" Value="True">
-                                                            <Setter Property="Foreground" Value="{StaticResource Yellow}"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding SourceNotAvailable}" Value="True">
-                                                            <Setter Property="Foreground" Value="{StaticResource FgSubtle}"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-
-                                        <!-- Version dropdown -->
-                                        <ComboBox ItemsSource="{Binding AvailableVersions}"
-                                                  SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
-                                                  Width="120" FontSize="11"
-                                                  VerticalAlignment="Center"
-                                                  Margin="0,0,6,0"/>
-
-                                        <!-- Download -->
-                                        <Button Content="Download"
-                                                Style="{StaticResource BtnAccent}"
-                                                IsEnabled="{Binding IsDownloadEnabled}"
-                                                Padding="10,4" Margin="0,0,6,0"
-                                                VerticalAlignment="Center"
-                                                Click="BtnDownload_Click"/>
-
-                                        <!-- Delete -->
-                                        <Button Content="Delete"
-                                                Style="{StaticResource BtnDanger}"
-                                                Padding="10,4"
-                                                VerticalAlignment="Center"
-                                                Click="BtnDeletePayload_Click"/>
-                                    </StackPanel>
+                                        <!-- RIGHT: version dropdown + Download + Delete -->
+                                        <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal"
+                                                    VerticalAlignment="Center">
+                                            <ComboBox ItemsSource="{Binding AvailableVersions}"
+                                                      SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
+                                                      Width="160" FontSize="11"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0"/>
+                                            <Button Content="Download"
+                                                    Style="{StaticResource BtnAccent}"
+                                                    IsEnabled="{Binding IsDownloadEnabled}"
+                                                    Padding="10,4" Margin="0,0,6,0"
+                                                    VerticalAlignment="Center"
+                                                    Click="BtnDownload_Click"/>
+                                            <Button Content="Delete"
+                                                    Style="{StaticResource BtnDanger}"
+                                                    Padding="10,4"
+                                                    VerticalAlignment="Center"
+                                                    Click="BtnDeletePayload_Click"/>
+                                        </StackPanel>
+                                    </Grid>
 
                                     <!-- ── Status text (progress / error) ────── -->
                                     <TextBlock Text="{Binding StatusText}"
                                                Foreground="{StaticResource FgSubtle}"
-                                               FontSize="11" Margin="18,4,0,0">
+                                               FontSize="11" Margin="18,6,0,0">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Visibility" Value="Collapsed"/>

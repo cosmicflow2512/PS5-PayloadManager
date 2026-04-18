@@ -262,23 +262,19 @@ public partial class FlowBuilderPage : UserControl
     {
         if (_steps.Count == 0) { AppendLog("Flow is empty — nothing to export."); return; }
 
-        // Compatibility check — offer to remove incompatible steps
+        // Compatibility check — block export for incompatible flows
         if (!FlowService.IsAutoloadCompatible(_steps, out var incompatible))
         {
-            var whatStr = string.Join(", ", incompatible.Take(3));
-            var answer  = MessageBox.Show(
-                $"This flow contains incompatible step(s): {whatStr}.\n\n" +
-                "Remove incompatible steps and export anyway?",
-                "Incompatible Steps",
-                MessageBoxButton.YesNo,
+            MessageBox.Show(
+                "Invalid Autoload Configuration\n\nNot allowed:\n" +
+                "• WAIT (port-based execution)\n" +
+                "• LUA payloads\n\n" +
+                "DELAY steps are allowed.\n\n" +
+                $"Remove first: {string.Join(", ", incompatible)}",
+                "Invalid Autoload Configuration",
+                MessageBoxButton.OK,
                 MessageBoxImage.Warning);
-
-            if (answer != MessageBoxResult.Yes) return;
-
-            int removed = FlowService.RemoveIncompatibleSteps(_steps);
-            UpdateCompatibilityBadge();
-            SyncFlowToConfig();
-            AppendLog($"Removed {removed} incompatible step(s) before export.");
+            return;
         }
 
         var elfSteps = _steps

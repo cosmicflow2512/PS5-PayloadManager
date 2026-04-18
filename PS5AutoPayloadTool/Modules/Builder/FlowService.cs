@@ -68,7 +68,7 @@ public static class FlowService
         foreach (var step in steps)
         {
             if (step.Type == "delay")
-                sb.AppendLine($"!{step.Ms}");
+                sb.AppendLine($"delay {step.Ms}");
             else if (step.Type == "payload" &&
                      !step.Payload.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
                 sb.AppendLine(step.Payload);

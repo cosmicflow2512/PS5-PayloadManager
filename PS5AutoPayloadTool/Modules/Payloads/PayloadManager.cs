@@ -42,8 +42,8 @@ public class PayloadManager(GitHubClient github)
 
         if (source.Type == "release")
         {
-            var releases = await github.GetReleasesAsync(source.Owner, source.Repo);
-            Log.Debug("PayloadManager", $"{source.Owner}/{source.Repo}: {releases.Count} release(s) fetched");
+            var releases = (await github.GetReleasesAsync(source.Owner, source.Repo)).Take(3).ToList();
+            Log.Debug("PayloadManager", $"{source.Owner}/{source.Repo}: {releases.Count} release(s) fetched (limited to 3)");
             foreach (var release in releases)
             {
                 ct.ThrowIfCancellationRequested();
@@ -125,6 +125,7 @@ public class PayloadManager(GitHubClient github)
         string downloadUrl,
         string version,
         string sourceUrl,
+        string publishedAt = "",
         IProgress<(long, long)>? progress = null,
         CancellationToken ct = default)
     {
@@ -174,6 +175,8 @@ public class PayloadManager(GitHubClient github)
         meta.FileHash           = ComputeSha256(activePath);
         meta.HasUpdateAvailable = false;
         meta.SourceNotAvailable = false;
+        if (!string.IsNullOrEmpty(publishedAt))
+            meta.PublishedAt = publishedAt;
         Log.Info("PayloadManager", $"Saved {name} v{version}  ({meta.Size} bytes  hash={meta.FileHash[..8]})");
     }
 
@@ -209,7 +212,7 @@ public class PayloadManager(GitHubClient github)
                 $"No valid payload found in release for '{name}'.");
         }
 
-        await DownloadAsync(config, name, match.DownloadUrl, match.Version, sourceUrl, progress, ct);
+        await DownloadAsync(config, name, match.DownloadUrl, match.Version, sourceUrl, match.PublishedAt, progress, ct);
     }
 
     // ── ZIP helpers ───────────────────────────────────────────────────────────

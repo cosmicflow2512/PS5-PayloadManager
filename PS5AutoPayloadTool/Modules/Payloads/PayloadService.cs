@@ -65,7 +65,14 @@ public class PayloadService(PayloadManager manager)
         {
             try
             {
-                var found = await manager.ScanSourceAsync(source, null, ct);
+                var rawFound = await manager.ScanSourceAsync(source, null, ct);
+                // Only compare against the latest (first) scan result per payload name.
+                // Processing older releases causes false "Update available" after download.
+                var latestByName = new Dictionary<string, ScanResult>(StringComparer.OrdinalIgnoreCase);
+                foreach (var f in rawFound)
+                    if (!latestByName.ContainsKey(f.Name))
+                        latestByName[f.Name] = f;
+                var found = latestByName.Values.ToList();
                 foreach (var r in found)
                 {
                     if (!config.PayloadMeta.ContainsKey(r.Name))
@@ -95,16 +102,28 @@ public class PayloadService(PayloadManager manager)
                     bool timestampNewer = false;
 
                     if (!versionChanged && !hashChanged && !sizeChanged
-                        && !string.IsNullOrEmpty(r.PublishedAt)
-                        && File.Exists(meta.LocalPath))
+                        && !string.IsNullOrEmpty(r.PublishedAt))
                     {
-                        if (DateTime.TryParse(r.PublishedAt, null,
-                                System.Globalization.DateTimeStyles.RoundtripKind,
-                                out var remoteDate))
+                        if (!string.IsNullOrEmpty(meta.PublishedAt))
                         {
-                            var localMtime = File.GetLastWriteTimeUtc(meta.LocalPath);
-                            // 60-second tolerance to ignore minor clock drift
-                            timestampNewer = remoteDate.ToUniversalTime() > localMtime.AddSeconds(60);
+                            // Compare recorded published_at timestamps (most reliable after download)
+                            if (DateTime.TryParse(r.PublishedAt, null,
+                                    System.Globalization.DateTimeStyles.RoundtripKind, out var remoteDate)
+                                && DateTime.TryParse(meta.PublishedAt, null,
+                                    System.Globalization.DateTimeStyles.RoundtripKind, out var savedDate))
+                            {
+                                timestampNewer = remoteDate > savedDate.AddSeconds(60);
+                            }
+                        }
+                        else if (File.Exists(meta.LocalPath))
+                        {
+                            // Fallback: compare against local file mtime (pre-publishedAt data)
+                            if (DateTime.TryParse(r.PublishedAt, null,
+                                    System.Globalization.DateTimeStyles.RoundtripKind, out var remoteDate))
+                            {
+                                var localMtime = File.GetLastWriteTimeUtc(meta.LocalPath);
+                                timestampNewer = remoteDate.ToUniversalTime() > localMtime.AddSeconds(60);
+                            }
                         }
                     }
 
@@ -181,7 +200,7 @@ public class PayloadService(PayloadManager manager)
             if (match == null) return "No valid payload found in release.";
 
             await manager.DownloadAsync(
-                config, name, match.DownloadUrl, match.Version, sourceUrl, progress, ct);
+                config, name, match.DownloadUrl, match.Version, sourceUrl, match.PublishedAt, progress, ct);
             return null;
         }
         catch (Exception ex) { return ex.Message; }
@@ -215,7 +234,7 @@ public class PayloadService(PayloadManager manager)
                 if (latest == null) continue;
 
                 await manager.DownloadAsync(
-                    config, name, latest.DownloadUrl, latest.Version, source.Url, null, ct);
+                    config, name, latest.DownloadUrl, latest.Version, source.Url, latest.PublishedAt, null, ct);
 
                 meta.Version            = latest.Version;
                 meta.HasUpdateAvailable = false;
@@ -286,7 +305,7 @@ public class PayloadService(PayloadManager manager)
                 }
 
                 await manager.DownloadAsync(
-                    config, name, match.DownloadUrl, match.Version, source.Url, null, ct);
+                    config, name, match.DownloadUrl, match.Version, source.Url, match.PublishedAt, null, ct);
 
                 var msg = match.Version != meta.Version && !string.IsNullOrEmpty(meta.Version)
                     ? $"{name}: updated to {match.Version} (requested {meta.Version})."

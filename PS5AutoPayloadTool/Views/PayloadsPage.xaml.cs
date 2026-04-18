@@ -102,8 +102,8 @@ public partial class PayloadsPage : UserControl
     private async void BtnDownload_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as Button)?.DataContext is not PayloadEntry entry) return;
-        var selectedVersion = entry.SelectedVersion;
-        if (string.IsNullOrEmpty(selectedVersion)) return;
+        var rawVersion = entry.RawDownloadVersion;
+        if (string.IsNullOrEmpty(rawVersion)) return;
 
         if (entry.SourceNotAvailable)
         {
@@ -111,7 +111,7 @@ public partial class PayloadsPage : UserControl
             return;
         }
 
-        if (selectedVersion == "local")
+        if (rawVersion == "local")
         {
             entry.StatusText = "Local payload — nothing to download.";
             return;
@@ -134,7 +134,7 @@ public partial class PayloadsPage : UserControl
                 }));
 
             var error = await MainWindow.PayloadSvc.DownloadVersionAsync(
-                MainWindow.Config, entry.Name, selectedVersion, entry.Meta.SourceUrl, progress);
+                MainWindow.Config, entry.Name, rawVersion, entry.Meta.SourceUrl, progress);
 
             if (error != null)
                 entry.StatusText = $"Error: {error}";
@@ -175,43 +175,96 @@ public class PayloadEntry : System.ComponentModel.INotifyPropertyChanged
 {
     public PayloadEntry(string name, PayloadMeta meta)
     {
-        Name            = name;
-        Meta            = meta;
-        SelectedVersion = !string.IsNullOrEmpty(meta.SourceUrl) ? "Latest" : meta.Version;
+        Name = name;
+        Meta = meta;
+        var versions = AvailableVersions;
+        _selectedVersion = versions.Count > 0 ? versions[0] : "";
     }
 
     public string      Name { get; }
     public PayloadMeta Meta { get; }
 
+    /// <summary>
+    /// Dropdown items: real version tags, newest labelled "(Latest)".
+    /// No generic "Latest" pseudo-entry. Local/unsourced payloads show "local".
+    /// </summary>
     public List<string> AvailableVersions
     {
         get
         {
-            var list = new List<string>();
-            if (!string.IsNullOrEmpty(Meta.SourceUrl))
-                list.Add("Latest");
-            list.AddRange(Meta.Versions.Where(v => v != "Latest"));
-            return list;
+            if (string.IsNullOrEmpty(Meta.SourceUrl) || Meta.Version == "local")
+                return new List<string> { "local" };
+
+            var versions = Meta.Versions
+                .Where(v => v != "Latest" && v != "local" && !string.IsNullOrEmpty(v))
+                .Distinct()
+                .ToList();
+
+            if (versions.Count == 0)
+            {
+                return string.IsNullOrEmpty(Meta.Version)
+                    ? new List<string>()
+                    : new List<string> { $"{Meta.Version} (Latest)" };
+            }
+
+            var result = new List<string>();
+            for (int i = 0; i < versions.Count; i++)
+                result.Add(i == 0 ? $"{versions[i]} (Latest)" : versions[i]);
+            return result;
         }
     }
 
-    public string CurrentVersionDisplay =>
-        Meta.SourceNotAvailable ? $"{Meta.Version} (Source not available)" :
-        Meta.HasUpdateAvailable ? $"{Meta.Version} (Update available)"     :
-                                  $"{Meta.Version} (Latest)";
+    /// <summary>
+    /// Current-version line text.
+    /// Format: "v1.03 (Latest)" / "v1.02 (Update available)" / "local" / "Latest"
+    /// </summary>
+    public string CurrentVersionDisplay
+    {
+        get
+        {
+            if (Meta.SourceNotAvailable)
+                return $"{Meta.Version} (Source not available)";
+            if (string.IsNullOrEmpty(Meta.SourceUrl) || Meta.Version == "local")
+                return "local";
+            if (string.IsNullOrEmpty(Meta.Version))
+                return "Latest";
+            if (Meta.HasUpdateAvailable)
+                return $"{Meta.Version} (Update available)";
+            return $"{Meta.Version} (Latest)";
+        }
+    }
 
-    public string SelectedVersion    { get; set; }
-    public bool   IsDownloaded       => Meta.IsDownloaded;
-    public bool   HasUpdate          => Meta.HasUpdateAvailable && !Meta.SourceNotAvailable;
-    public bool   SourceNotAvailable => Meta.SourceNotAvailable;
-    public bool   IsDownloadEnabled  => !Meta.SourceNotAvailable && Meta.Version != "local";
-    public string Id                 => Name;
+    private string _selectedVersion = "";
+    public string SelectedVersion
+    {
+        get => _selectedVersion;
+        set { _selectedVersion = value ?? ""; OnChanged(nameof(SelectedVersion)); }
+    }
+
+    /// <summary>Strips the " (Latest)" display suffix to get the raw version tag for API calls.</summary>
+    public string RawDownloadVersion
+    {
+        get
+        {
+            const string suffix = " (Latest)";
+            return _selectedVersion.EndsWith(suffix)
+                ? _selectedVersion[..^suffix.Length]
+                : _selectedVersion;
+        }
+    }
+
+    public bool IsDownloaded       => Meta.IsDownloaded;
+    public bool HasUpdate          => Meta.HasUpdateAvailable && !Meta.SourceNotAvailable;
+    public bool SourceNotAvailable => Meta.SourceNotAvailable;
+    public bool IsDownloadEnabled  => !Meta.SourceNotAvailable
+                                   && Meta.Version != "local"
+                                   && !string.IsNullOrEmpty(Meta.SourceUrl);
 
     private string _statusText = "";
     public string StatusText
     {
         get => _statusText;
-        set { _statusText = value; OnChanged(nameof(StatusText)); OnChanged(nameof(HasStatus)); }
+        set { _statusText = value ?? ""; OnChanged(nameof(StatusText)); OnChanged(nameof(HasStatus)); }
     }
 
     public bool HasStatus => !string.IsNullOrEmpty(_statusText);
