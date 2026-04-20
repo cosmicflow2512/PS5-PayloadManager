@@ -100,21 +100,31 @@ public static class FlowService
             if (config.PayloadMeta.TryGetValue(step.Payload, out var meta)
                 && !string.IsNullOrEmpty(meta.Version))
             {
+                // Build VersionOptions: "Latest" first, then meta.Version (authoritative
+                // current version), then all others in reverse-insertion order so the
+                // most recently discovered update appears near the top.
                 var opts = new List<string> { "Latest" };
-                foreach (var v in meta.Versions)
+                if (!string.IsNullOrEmpty(meta.Version) && meta.Version != "folder")
+                    opts.Add(meta.Version);
+                for (int i = meta.Versions.Count - 1; i >= 0; i--)
+                {
+                    var v = meta.Versions[i];
                     if (v != "folder" && !opts.Contains(v))
                         opts.Add(v);
+                }
                 step.VersionOptions = opts;
 
                 // Ensure persisted selection is still a valid choice
                 if (!opts.Contains(step.SelectedVersion))
                     step.SelectedVersion = "Latest";
 
+                // Effective version for "Latest": the currently downloaded version
+                // (meta.Version), which is what ExportService actually uses from PayloadsDir.
                 var effective = step.SelectedVersion == "Latest"
-                    ? (meta.Versions.Count > 0 ? meta.Versions[0] : meta.Version)
+                    ? (!string.IsNullOrEmpty(meta.Version) ? meta.Version : "")
                     : step.SelectedVersion;
 
-                step.VersionLabel = $"({effective})";
+                step.VersionLabel = string.IsNullOrEmpty(effective) ? "" : $"({effective})";
             }
             else
             {

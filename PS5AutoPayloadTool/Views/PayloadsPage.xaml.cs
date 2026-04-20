@@ -185,8 +185,10 @@ public class PayloadEntry : System.ComponentModel.INotifyPropertyChanged
     public PayloadMeta Meta { get; }
 
     /// <summary>
-    /// Dropdown items: real version tags, newest labelled "(Latest)".
-    /// No generic "Latest" pseudo-entry. Local/unsourced payloads show "local".
+    /// Dropdown items for selecting a version to download.
+    /// meta.Version (currently active/downloaded) is shown first and labelled "(Latest)".
+    /// Remaining versions are in reverse-insertion order (newest discovered update first).
+    /// Local/unsourced payloads show "local".
     /// </summary>
     public List<string> AvailableVersions
     {
@@ -195,12 +197,12 @@ public class PayloadEntry : System.ComponentModel.INotifyPropertyChanged
             if (string.IsNullOrEmpty(Meta.SourceUrl) || Meta.Version == "local")
                 return new List<string> { "local" };
 
-            var versions = Meta.Versions
+            var allVersions = Meta.Versions
                 .Where(v => v != "Latest" && v != "local" && !string.IsNullOrEmpty(v))
                 .Distinct()
                 .ToList();
 
-            if (versions.Count == 0)
+            if (allVersions.Count == 0)
             {
                 return string.IsNullOrEmpty(Meta.Version)
                     ? new List<string>()
@@ -208,8 +210,24 @@ public class PayloadEntry : System.ComponentModel.INotifyPropertyChanged
             }
 
             var result = new List<string>();
-            for (int i = 0; i < versions.Count; i++)
-                result.Add(i == 0 ? $"{versions[i]} (Latest)" : versions[i]);
+
+            // meta.Version is the authoritative "latest downloaded" — always shown first.
+            if (!string.IsNullOrEmpty(Meta.Version) && allVersions.Contains(Meta.Version))
+                result.Add($"{Meta.Version} (Latest)");
+
+            // Remaining versions in reverse-insertion order so the most recently
+            // appended entry (newest update from CheckUpdates) appears near the top.
+            for (int i = allVersions.Count - 1; i >= 0; i--)
+            {
+                var v = allVersions[i];
+                if (v != Meta.Version)
+                    result.Add(v);
+            }
+
+            // Edge case: meta.Version was not in the Versions list (e.g. after import).
+            if (!string.IsNullOrEmpty(Meta.Version) && !allVersions.Contains(Meta.Version))
+                result.Insert(0, $"{Meta.Version} (Latest)");
+
             return result;
         }
     }
