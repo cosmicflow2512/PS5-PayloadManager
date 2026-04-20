@@ -312,7 +312,7 @@ public static class ApiServer
         });
 
         // ── Source: get releases ──────────────────────────────────────────────
-        app.MapGet("/api/sources/releases", async ctx =>
+        app.MapGet("/api/sources/releases", async Task<IResult> (HttpContext ctx) =>
         {
             var repo   = NormalizeRepo(ctx.Request.Query["repo"].FirstOrDefault() ?? "");
             var filter = ctx.Request.Query["filter"].FirstOrDefault() ?? "";
