@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace PS5AutoPayloadTool.Core;
 
 public static class AppPaths
