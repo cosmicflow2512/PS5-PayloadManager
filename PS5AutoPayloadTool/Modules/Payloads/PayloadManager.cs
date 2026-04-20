@@ -19,6 +19,9 @@ public record ScanResult(
 
 public class PayloadManager(GitHubClient github)
 {
+    // Mirrors HA config.MAX_PAYLOAD_VERSIONS = 5
+    private const int MaxPayloadVersions = 5;
+
     // ZIP-sourced payloads use this URL convention:
     //   zip:{zipBrowserDownloadUrl}|{entryFullName}
     private const string ZipUrlPrefix    = "zip:";
@@ -157,6 +160,15 @@ public class PayloadManager(GitHubClient github)
 
         Directory.CreateDirectory(AppPaths.PayloadsDir);
         var activePath = Path.Combine(AppPaths.PayloadsDir, name);
+
+        // Keep a rollback backup before overwriting the active file
+        if (File.Exists(activePath))
+        {
+            var backupPath = activePath + ".bak";
+            try { File.Copy(activePath, backupPath, overwrite: true); }
+            catch (Exception ex) { Log.Warn("PayloadManager", $"Rollback backup failed: {ex.Message}"); }
+        }
+
         File.Copy(cachePath, activePath, overwrite: true);
 
         if (!config.PayloadMeta.TryGetValue(name, out var meta))
@@ -167,6 +179,10 @@ public class PayloadManager(GitHubClient github)
 
         if (!meta.Versions.Contains(version))
             meta.Versions.Add(version);
+
+        // Mirrors HA trim_versions(): keep only the newest MaxPayloadVersions entries.
+        if (meta.Versions.Count > MaxPayloadVersions)
+            meta.Versions = meta.Versions[^MaxPayloadVersions..].ToList();
 
         meta.Version            = version;
         meta.LocalPath          = activePath;

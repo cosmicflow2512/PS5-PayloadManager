@@ -13,7 +13,8 @@ namespace PS5AutoPayloadTool.Modules.Execution;
 ///   filename.bin [port]                     → SendDirective  (default port 9021)
 ///   !&lt;ms&gt;                                  → DelayDirective
 ///   ?&lt;port&gt; [timeout_s] [interval_ms]       → WaitPortDirective
-///   # comment                               → ignored
+///   # ~version filename.elf v1.0.3          → version pin (resolved to cache path)
+///   # other comment                         → ignored
 /// </summary>
 public static class ProfileParser
 {
@@ -27,9 +28,15 @@ public static class ProfileParser
     private static readonly Regex WaitPortRx =
         new(@"^\?(\d+)(?:\s+(\d+))?(?:\s+(\d+))?$", RegexOptions.Compiled);
 
+    private static readonly Regex VersionPinRx =
+        new(@"^#\s*~version\s+(\S+)\s+(\S+)\s*$", RegexOptions.Compiled);
+
     /// <summary>Parses raw text content into a list of directives.</summary>
     public static List<IDirective> Parse(string content, string payloadDirectory)
     {
+        // First pass: collect all version pins  (# ~version filename tag)
+        var pins = Builder.FlowService.ParseVersionPins(content);
+
         var directives = new List<IDirective>();
 
         foreach (var rawLine in content.Split('\n'))
@@ -65,11 +72,24 @@ public static class ProfileParser
                     ? int.Parse(pm.Groups[2].Value)
                     : PayloadSender.GetDefaultPort(filename);
 
-                directives.Add(new SendDirective
+                // If a version pin exists for this file, resolve it from the
+                // version cache (CacheDir/filename/version/filename).
+                // Falls back to the active PayloadsDir copy when cache is absent.
+                string filePath;
+                if (pins.TryGetValue(filename, out var pinnedVersion))
                 {
-                    FilePath = Path.Combine(payloadDirectory, filename),
-                    Port     = port
-                });
+                    var cachePath = System.IO.Path.Combine(
+                        Core.AppPaths.CacheDir, filename, pinnedVersion, filename);
+                    filePath = System.IO.File.Exists(cachePath)
+                        ? cachePath
+                        : System.IO.Path.Combine(payloadDirectory, filename);
+                }
+                else
+                {
+                    filePath = System.IO.Path.Combine(payloadDirectory, filename);
+                }
+
+                directives.Add(new SendDirective { FilePath = filePath, Port = port });
             }
         }
 

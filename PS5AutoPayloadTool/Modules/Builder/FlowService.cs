@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using PS5AutoPayloadTool.Models;
 
 namespace PS5AutoPayloadTool.Modules.Builder;
@@ -11,6 +12,105 @@ namespace PS5AutoPayloadTool.Modules.Builder;
 /// </summary>
 public static class FlowService
 {
+    // ── Version tier sorting ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Stable-sorts version tags exactly as the HA tool does:
+    ///   stable release (tier 0) → beta (tier 1) → alpha / test (tier 2).
+    /// Within each tier the original insertion order is preserved.
+    /// </summary>
+    public static List<string> SortVersionsByTier(IEnumerable<string> versions)
+    {
+        static int Tier(string tag)
+        {
+            var t = tag.ToLowerInvariant();
+            if (t.Contains("alpha") || t.Contains("test")) return 2;
+            if (t.Contains("beta"))                         return 1;
+            return 0;
+        }
+        return versions.OrderBy(Tier).ToList();
+    }
+
+    // ── Version pin comments ──────────────────────────────────────────────────
+
+    // Mirrors HA autoload_parser.py: # ~version <filename> <tag>
+    private static readonly Regex _versionPinRx =
+        new(@"^#\s*~version\s+(\S+)\s+(\S+)\s*$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Reads all <c># ~version filename tag</c> comments from a profile and
+    /// returns a filename → version map.  Mirrors HA parse_version_pins().
+    /// </summary>
+    public static Dictionary<string, string> ParseVersionPins(string content)
+    {
+        var pins = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var raw in content.Split('\n'))
+        {
+            var m = _versionPinRx.Match(raw.Trim());
+            if (m.Success) pins[m.Groups[1].Value] = m.Groups[2].Value;
+        }
+        return pins;
+    }
+
+    /// <summary>
+    /// Sets or replaces the <c># ~version filename tag</c> line for one file
+    /// inside a profile's text content.  Mirrors HA set_version_pin().
+    /// </summary>
+    public static string SetVersionPin(string content, string filename, string version)
+    {
+        var pinLine = $"# ~version {filename} {version}";
+        var lines   = content.Split('\n').ToList();
+
+        // Replace existing pin for this file
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var m = _versionPinRx.Match(lines[i].Trim());
+            if (m.Success && m.Groups[1].Value.Equals(filename, StringComparison.OrdinalIgnoreCase))
+            {
+                lines[i] = pinLine;
+                return string.Join("\n", lines);
+            }
+        }
+
+        // Insert before the first non-comment, non-empty line
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var t = lines[i].Trim();
+            if (t.Length > 0 && !t.StartsWith('#'))
+            {
+                lines.Insert(i, pinLine);
+                return string.Join("\n", lines);
+            }
+        }
+
+        return content.TrimEnd('\n') + "\n" + pinLine + "\n";
+    }
+
+    /// <summary>
+    /// Generates a profile .txt that embeds a <c># ~version</c> pin comment
+    /// before each payload line whose step has a pinned (non-"Latest") version.
+    /// Mirrors the HA convention so profiles are portable between tools.
+    /// </summary>
+    public static string BuildProfileWithPins(IEnumerable<BuilderStep> steps)
+    {
+        var sb = new StringBuilder();
+        foreach (var step in steps)
+        {
+            var line = step.ToProfileLine();
+            if (string.IsNullOrEmpty(line)) continue;
+
+            if (step.Type == "payload"
+                && !string.IsNullOrEmpty(step.SelectedVersion)
+                && step.SelectedVersion != "Latest")
+            {
+                sb.AppendLine($"# ~version {step.Payload} {step.SelectedVersion}");
+            }
+            sb.AppendLine(line);
+        }
+        return sb.ToString().TrimEnd();
+    }
+
+
     // ── Compatibility ────────────────────────────────────────────────────────
 
     /// <summary>
@@ -100,18 +200,24 @@ public static class FlowService
             if (config.PayloadMeta.TryGetValue(step.Payload, out var meta)
                 && !string.IsNullOrEmpty(meta.Version))
             {
-                // Build VersionOptions: "Latest" first, then meta.Version (authoritative
-                // current version), then all others in reverse-insertion order so the
-                // most recently discovered update appears near the top.
-                var opts = new List<string> { "Latest" };
-                if (!string.IsNullOrEmpty(meta.Version) && meta.Version != "folder")
-                    opts.Add(meta.Version);
-                for (int i = meta.Versions.Count - 1; i >= 0; i--)
+                // Build VersionOptions: "Latest" first, then tier-sorted versions
+                // (stable → beta → alpha/test), with meta.Version leading its tier
+                // so the currently active version is always visible near the top.
+                var rawVersions = meta.Versions
+                    .Where(v => v != "folder" && !string.IsNullOrEmpty(v))
+                    .Distinct()
+                    .ToList();
+                var sorted = SortVersionsByTier(rawVersions);
+                // Promote meta.Version to the front of its tier group
+                if (!string.IsNullOrEmpty(meta.Version) && sorted.Contains(meta.Version))
                 {
-                    var v = meta.Versions[i];
-                    if (v != "folder" && !opts.Contains(v))
-                        opts.Add(v);
+                    sorted.Remove(meta.Version);
+                    sorted.Insert(0, meta.Version);
                 }
+                var opts = new List<string> { "Latest" };
+                foreach (var v in sorted)
+                    if (!opts.Contains(v))
+                        opts.Add(v);
                 step.VersionOptions = opts;
 
                 // Ensure persisted selection is still a valid choice

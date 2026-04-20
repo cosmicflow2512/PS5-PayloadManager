@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using PS5AutoPayloadTool.Models;
 
@@ -61,14 +62,22 @@ public class ExecEngine
     public async Task RunAsync(
         string host,
         List<IDirective> directives,
-        bool continueOnError = false)
+        bool continueOnError = false,
+        bool safeMode = false)
     {
         _cts?.Dispose();
         _cts    = new CancellationTokenSource();
         _paused = false;
         State   = ExecState.Running;
 
-        var ct = _cts.Token;
+        var ct        = _cts.Token;
+        var runId     = Guid.NewGuid().ToString("N")[..8];
+        var startedAt = DateTime.UtcNow.ToString("O");
+        var runSteps  = new List<FlowRunStep>();
+        var totalSw   = Stopwatch.StartNew();
+
+        if (safeMode)
+            Raise("SAFE MODE — no payloads will be sent.", ExecState.Running, -1, -1);
 
         try
         {
@@ -79,15 +88,25 @@ public class ExecEngine
                 if (_paused)
                     await _pauseGate.WaitAsync(ct);
 
+                var stepSw = Stopwatch.StartNew();
                 string result = directives[i] switch
                 {
-                    SendDirective    s => await RunSend(host, s, i, directives.Count, ct),
-                    DelayDirective   d => await RunDelay(d, i, directives.Count, ct),
+                    SendDirective     s => await RunSend(host, s, i, directives.Count, ct, safeMode),
+                    DelayDirective    d => await RunDelay(d, i, directives.Count, ct),
                     WaitPortDirective w => await RunWaitPort(host, w, i, directives.Count, ct),
-                    _                  => "Unknown directive — skipped."
+                    _                   => "Unknown directive — skipped."
                 };
+                stepSw.Stop();
 
                 bool failed = result.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase);
+
+                runSteps.Add(new FlowRunStep(
+                    Type:       StepType(directives[i]),
+                    Label:      StepLabel(directives[i]),
+                    DurationMs: (int)stepSw.ElapsedMilliseconds,
+                    Success:    !failed,
+                    Error:      failed ? result : null));
+
                 if (failed && !continueOnError)
                 {
                     State = ExecState.Failed;
@@ -110,6 +129,13 @@ public class ExecEngine
         }
         finally
         {
+            totalSw.Stop();
+            FlowRunHistory.RecordRun(new FlowRunRecord(
+                Id:        runId,
+                StartedAt: startedAt,
+                TotalMs:   (int)totalSw.ElapsedMilliseconds,
+                SafeMode:  safeMode,
+                Steps:     runSteps));
             _cts.Dispose();
             _cts = null;
         }
@@ -118,10 +144,17 @@ public class ExecEngine
     // ── Step handlers ─────────────────────────────────────────────────────────
 
     private async Task<string> RunSend(
-        string host, SendDirective s, int idx, int total, CancellationToken ct)
+        string host, SendDirective s, int idx, int total, CancellationToken ct, bool safeMode = false)
     {
         Raise($"[{idx + 1}/{total}] Sending {Path.GetFileName(s.FilePath)} → :{s.Port}",
               ExecState.Running, idx, total);
+
+        if (safeMode)
+        {
+            var safeMsg = $"[SAFE] [{idx + 1}/{total}] Skipped send {Path.GetFileName(s.FilePath)} → :{s.Port}";
+            Raise(safeMsg, ExecState.Running, idx, total);
+            return safeMsg;
+        }
 
         var result = await PayloadSender.SendAsync(host, s.Port, s.FilePath, cancellationToken: ct);
 
@@ -148,6 +181,7 @@ public class ExecEngine
               ExecState.Running, idx, total);
 
         var progress = new Progress<string>(msg => Raise(msg, ExecState.Running, idx, total));
+        var sw = Stopwatch.StartNew();
 
         bool ok = await PortChecker.WaitForPortAsync(
             host, w.Port,
@@ -155,6 +189,10 @@ public class ExecEngine
             intervalMs: w.IntervalMs,
             progress: progress,
             cancellationToken: ct);
+        sw.Stop();
+
+        if (ok)
+            PortTimingService.Record(w.Port, (int)sw.ElapsedMilliseconds);
 
         var msg = ok
             ? $"[{idx + 1}/{total}] Port {w.Port} is open."
@@ -165,6 +203,22 @@ public class ExecEngine
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
+
+    private static string StepType(IDirective d) => d switch
+    {
+        SendDirective     => "send",
+        DelayDirective    => "delay",
+        WaitPortDirective => "wait_port",
+        _                 => "unknown"
+    };
+
+    private static string StepLabel(IDirective d) => d switch
+    {
+        SendDirective     s => Path.GetFileName(s.FilePath),
+        DelayDirective    dl => $"{dl.DelayMs} ms",
+        WaitPortDirective w => $"port {w.Port}",
+        _                   => "unknown"
+    };
 
     private void Raise(string message, ExecState state, int stepIndex, int totalSteps)
         => ProgressChanged?.Invoke(this, new ExecProgressEventArgs

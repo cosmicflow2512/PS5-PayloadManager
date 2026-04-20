@@ -46,6 +46,83 @@ public class PayloadService(PayloadManager manager)
         config.PayloadMeta.Remove(name);
     }
 
+    /// <summary>
+    /// Restores the .bak rollback file as the active payload.
+    /// Mirrors HA rollback_payload(). Returns true on success.
+    /// </summary>
+    public bool Rollback(AppConfig config, string name)
+    {
+        var activePath = Path.Combine(AppPaths.PayloadsDir, name);
+        var backupPath = activePath + ".bak";
+        if (!File.Exists(backupPath)) return false;
+        try
+        {
+            File.Copy(backupPath, activePath, overwrite: true);
+            Log.Info("PayloadService", $"Rollback: restored {name} from .bak");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("PayloadService", $"Rollback failed for {name}: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Returns the profile names that reference <paramref name="name"/>.
+    /// Mirrors HA get_payload_usage().
+    /// </summary>
+    public static List<string> GetUsage(AppConfig config, string name)
+    {
+        var used = new List<string>();
+        foreach (var (profileName, content) in config.Profiles)
+        {
+            foreach (var raw in content.Split('\n'))
+            {
+                var line = raw.Trim();
+                if (string.IsNullOrEmpty(line) || line.StartsWith('#')) continue;
+                var first = line.Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries)[0];
+                if (first.Equals(name, StringComparison.OrdinalIgnoreCase))
+                {
+                    used.Add(profileName);
+                    break;
+                }
+            }
+        }
+        return used;
+    }
+
+    /// <summary>
+    /// Switches the active payload to a cached version without re-downloading.
+    /// Mirrors HA set_default_version(). Returns true on success.
+    /// </summary>
+    public bool SetDefaultVersion(AppConfig config, string name, string version)
+    {
+        var cachePath  = Path.Combine(AppPaths.CacheDir, name, version, name);
+        if (!File.Exists(cachePath))
+        {
+            Log.Warn("PayloadService", $"SetDefaultVersion: cache missing for {name} {version}");
+            return false;
+        }
+
+        var activePath = Path.Combine(AppPaths.PayloadsDir, name);
+        Directory.CreateDirectory(AppPaths.PayloadsDir);
+
+        if (File.Exists(activePath))
+            try { File.Copy(activePath, activePath + ".bak", overwrite: true); } catch { }
+
+        File.Copy(cachePath, activePath, overwrite: true);
+
+        if (config.PayloadMeta.TryGetValue(name, out var meta))
+        {
+            meta.Version            = version;
+            meta.LocalPath          = activePath;
+            meta.HasUpdateAvailable = false;
+            Log.Info("PayloadService", $"SetDefaultVersion: {name} → {version}");
+        }
+        return true;
+    }
+
     // ── Update detection ─────────────────────────────────────────────────────
 
     /// <summary>

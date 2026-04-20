@@ -240,7 +240,7 @@ public partial class FlowBuilderPage : UserControl
         }
 
         var fileName = $"{name}.txt";
-        var content  = string.Join("\n", _steps.Select(s => s.ToProfileLine()).Where(l => l.Length > 0));
+        var content  = FlowService.BuildProfileWithPins(_steps);
         Directory.CreateDirectory(AppPaths.ProfilesDir);
         File.WriteAllText(Path.Combine(AppPaths.ProfilesDir, fileName), content);
         MainWindow.Config.Profiles[fileName]          = content;
@@ -329,7 +329,7 @@ public partial class FlowBuilderPage : UserControl
         if (_steps.Count == 0) { AppendLog("Flow is empty — nothing to run."); return; }
 
         var host    = GetSelectedHost();
-        var content = string.Join("\n", _steps.Select(s => s.ToProfileLine()).Where(l => l.Length > 0));
+        var content = FlowService.BuildProfileWithPins(_steps);
         var parsed  = ProfileParser.Parse(content, AppPaths.PayloadsDir);
 
         BtnRun.IsEnabled  = false;
@@ -337,7 +337,7 @@ public partial class FlowBuilderPage : UserControl
         PrgFlow.Value     = 0;
 
         MainWindow.Config.PS5Host = host;
-        await _engine.RunAsync(host, parsed);
+        await _engine.RunAsync(host, parsed, safeMode: ChkSafeMode.IsChecked == true);
 
         BtnRun.IsEnabled  = true;
         BtnStop.IsEnabled = false;

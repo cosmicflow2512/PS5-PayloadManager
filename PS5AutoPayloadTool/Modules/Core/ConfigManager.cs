@@ -162,6 +162,71 @@ public static class ConfigManager
         }
     }
 
+    /// <summary>
+    /// Selectively merges sections from <paramref name="backup"/> into <paramref name="current"/>.
+    /// Sections: "sources", "payloads", "profiles", "settings", "state".
+    /// conflictMode "replace" overwrites existing keys; "skip" keeps them.
+    /// Mirrors HA restore_backup_selective().
+    /// </summary>
+    public static void RestoreSelective(
+        AppConfig backup,
+        AppConfig current,
+        IEnumerable<string> sections,
+        string conflictMode = "replace")
+    {
+        bool replace = !string.Equals(conflictMode, "skip", StringComparison.OrdinalIgnoreCase);
+        var sectionSet = new HashSet<string>(sections, StringComparer.OrdinalIgnoreCase);
+
+        if (sectionSet.Contains("sources"))
+        {
+            foreach (var src in backup.Sources)
+            {
+                var existing = current.Sources.FirstOrDefault(s => s.Url == src.Url);
+                if (existing == null)
+                    current.Sources.Add(src);
+                else if (replace)
+                {
+                    current.Sources.Remove(existing);
+                    current.Sources.Add(src);
+                }
+            }
+        }
+
+        if (sectionSet.Contains("payloads"))
+        {
+            foreach (var (name, meta) in backup.PayloadMeta)
+            {
+                if (!current.PayloadMeta.ContainsKey(name) || replace)
+                    current.PayloadMeta[name] = meta;
+            }
+        }
+
+        if (sectionSet.Contains("profiles"))
+        {
+            foreach (var (name, content) in backup.Profiles)
+            {
+                if (!current.Profiles.ContainsKey(name) || replace)
+                    current.Profiles[name] = content;
+            }
+        }
+
+        if (sectionSet.Contains("settings") && backup.Ports != null)
+        {
+            if (replace)
+                current.Ports = backup.Ports;
+        }
+
+        if (sectionSet.Contains("state"))
+        {
+            if (replace || string.IsNullOrEmpty(current.State.PS5Ip))
+                current.State.PS5Ip = backup.State.PS5Ip;
+            if (replace || string.IsNullOrEmpty(current.State.GitHubToken))
+                current.State.GitHubToken = backup.State.GitHubToken;
+        }
+
+        SyncProfilesToDisk(current);
+    }
+
     // ── Format-agnostic parser ────────────────────────────────────────────────
 
     private static AppConfig? ParseAnyFormat(string json)

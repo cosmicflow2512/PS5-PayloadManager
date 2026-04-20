@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>PS5AutoPayloadTool</AssemblyName>
     <RootNamespace>PS5AutoPayloadTool</RootNamespace>
-    <Version>1.0.1</Version>
+    <Version>1.1.0</Version>
     <Company>cosmicflow2512</Company>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <Product>PS5 AutoPayload Tool</Product>

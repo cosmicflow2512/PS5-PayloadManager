@@ -311,6 +311,12 @@
                             Style="{StaticResource BtnRed}"
                             IsEnabled="False"
                             Click="BtnStopFlow_Click"/>
+                    <CheckBox x:Name="ChkSafeMode"
+                              Content="Safe mode"
+                              Foreground="{StaticResource FgSubtle}"
+                              VerticalAlignment="Center"
+                              Margin="12,0,0,0"
+                              ToolTip="Run flow without sending payloads (dry run / test mode)"/>
                 </StackPanel>
 
                 <!-- Save name panel (hidden until "Save as Profile" clicked) -->

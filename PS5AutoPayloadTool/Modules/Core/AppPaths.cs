@@ -28,6 +28,12 @@ public static class AppPaths
     /// <summary>Rotating log files.</summary>
     public static string LogsDir => Path.Combine(Base, "logs");
 
+    /// <summary>Port-timing statistics JSON.</summary>
+    public static string TimingFile => Path.Combine(Base, "timing.json");
+
+    /// <summary>Flow-run history JSON.</summary>
+    public static string FlowRunsFile => Path.Combine(Base, "flow_runs.json");
+
     /// <summary>
     /// Called once on startup. Creates every required directory if it does not
     /// already exist. Safe to call multiple times (no-op when dirs exist).

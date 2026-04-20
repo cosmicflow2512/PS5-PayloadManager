@@ -70,6 +70,10 @@ public class GitHubClient
         PropertyNameCaseInsensitive = true
     };
 
+    // Mirrors HA _tree_cache: 5-minute TTL per owner/repo/path key
+    private static readonly Dictionary<string, (DateTime Expiry, List<GhContent> Data)> _folderCache = new();
+    private static readonly TimeSpan _cacheTtl = TimeSpan.FromMinutes(5);
+
     public GitHubClient(string? token = null)
     {
         _http = new HttpClient();
@@ -96,12 +100,19 @@ public class GitHubClient
 
     public async Task<List<GhContent>> GetFolderContentsAsync(string owner, string repo, string path)
     {
+        var cacheKey = $"{owner}/{repo}/{path}";
+        if (_folderCache.TryGetValue(cacheKey, out var cached) && DateTime.UtcNow < cached.Expiry)
+            return cached.Data;
+
         var encodedPath = path.TrimStart('/');
         var url = $"https://api.github.com/repos/{owner}/{repo}/contents/{encodedPath}";
         var response = await _http.GetAsync(url);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<List<GhContent>>(json, _jsonOpts) ?? new();
+        var result = JsonSerializer.Deserialize<List<GhContent>>(json, _jsonOpts) ?? new();
+
+        _folderCache[cacheKey] = (DateTime.UtcNow.Add(_cacheTtl), result);
+        return result;
     }
 
     public async Task DownloadFileAsync(
