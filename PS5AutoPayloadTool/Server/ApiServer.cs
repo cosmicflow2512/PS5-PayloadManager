@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using PS5AutoPayloadTool.Core;
 
 namespace PS5AutoPayloadTool.Server;
@@ -81,7 +82,7 @@ public static class ApiServer
             await ctx.Response.WriteAsync(s.ToJsonString());
         });
 
-        app.MapPost("/api/state", async ctx =>
+        app.MapPost("/api/state", async Task<IResult> (HttpContext ctx) =>
         {
             var body = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
             var node = JsonNode.Parse(body) as JsonObject;
@@ -102,7 +103,7 @@ public static class ApiServer
             return Results.Json(new { devices });
         });
 
-        app.MapPost("/api/devices", async ctx =>
+        app.MapPost("/api/devices", async Task<IResult> (HttpContext ctx) =>
         {
             var body = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
             var req  = JsonSerializer.Deserialize<DevicesRequest>(body, _jo);
@@ -119,7 +120,7 @@ public static class ApiServer
         });
 
         // ── Upload payload ────────────────────────────────────────────────────
-        app.MapPost("/api/payloads/upload", async ctx =>
+        app.MapPost("/api/payloads/upload", async Task<IResult> (HttpContext ctx) =>
         {
             var form = await ctx.Request.ReadFormAsync();
             var saved = new List<string>();
@@ -156,7 +157,7 @@ public static class ApiServer
         });
 
         // ── Import payload from GitHub ────────────────────────────────────────
-        app.MapPost("/api/payloads/import", async ctx =>
+        app.MapPost("/api/payloads/import", async Task<IResult> (HttpContext ctx) =>
         {
             var body = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
             var req  = JsonSerializer.Deserialize<ImportRequest>(body, _jo);
@@ -230,7 +231,7 @@ public static class ApiServer
         // ── Sources ───────────────────────────────────────────────────────────
         app.MapGet("/api/sources", () => Results.Json(Storage.LoadSources()));
 
-        app.MapPost("/api/sources", async ctx =>
+        app.MapPost("/api/sources", async Task<IResult> (HttpContext ctx) =>
         {
             var body = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
             var req  = JsonSerializer.Deserialize<SourceRequest>(body, _jo);
@@ -302,7 +303,7 @@ public static class ApiServer
         });
 
         // ── Source: get repo folders ──────────────────────────────────────────
-        app.MapGet("/api/sources/tree", async ctx =>
+        app.MapGet("/api/sources/tree", async Task<IResult> (HttpContext ctx) =>
         {
             var repo = ctx.Request.Query["repo"].FirstOrDefault() ?? "";
             repo = NormalizeRepo(repo);
@@ -330,7 +331,7 @@ public static class ApiServer
         });
 
         // ── Send payload ──────────────────────────────────────────────────────
-        app.MapPost("/api/send", async ctx =>
+        app.MapPost("/api/send", async Task<IResult> (HttpContext ctx) =>
         {
             var body = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
             var req  = JsonSerializer.Deserialize<SendRequest>(body, _jo);
@@ -352,7 +353,7 @@ public static class ApiServer
             return content != null ? Results.Text(content) : Results.NotFound();
         });
 
-        app.MapPost("/api/autoload/content", async ctx =>
+        app.MapPost("/api/autoload/content", async Task<IResult> (HttpContext ctx) =>
         {
             var body = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
             var req  = JsonSerializer.Deserialize<SaveProfileRequest>(body, _jo);
@@ -399,7 +400,7 @@ public static class ApiServer
             Results.Json(new { state = ExecEngine.State, profile = ExecEngine.Profile }));
 
         // ── Autoload: run ─────────────────────────────────────────────────────
-        app.MapPost("/api/autoload/run", async ctx =>
+        app.MapPost("/api/autoload/run", async Task<IResult> (HttpContext ctx) =>
         {
             var body = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
             var req  = JsonSerializer.Deserialize<RunRequest>(body, _jo);
@@ -439,7 +440,7 @@ public static class ApiServer
         });
 
         // ── Autoload: export ZIP ──────────────────────────────────────────────
-        app.MapPost("/api/autoload/export-zip", async ctx =>
+        app.MapPost("/api/autoload/export-zip", async Task<IResult> (HttpContext ctx) =>
         {
             var body  = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
             var req   = JsonNode.Parse(body);
@@ -500,14 +501,11 @@ public static class ApiServer
 
             ms.Position = 0;
             var zipBytes = ms.ToArray();
-            ctx.Response.ContentType = "application/zip";
-            ctx.Response.Headers["Content-Disposition"] = "attachment; filename=\"autoload.zip\"";
-            await ctx.Response.Body.WriteAsync(zipBytes);
-            return null!;
+            return Results.Bytes(zipBytes, "application/zip", "autoload.zip");
         });
 
         // ── Port check ────────────────────────────────────────────────────────
-        app.MapPost("/api/port/check", async ctx =>
+        app.MapPost("/api/port/check", async Task<IResult> (HttpContext ctx) =>
         {
             var body = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
             var req  = JsonSerializer.Deserialize<PortCheckRequest>(body, _jo);
@@ -516,7 +514,7 @@ public static class ApiServer
             return Results.Json(new { open, host = req.Host, port = req.Port });
         });
 
-        app.MapPost("/api/port/wait", async ctx =>
+        app.MapPost("/api/port/wait", async Task<IResult> (HttpContext ctx) =>
         {
             var body = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
             var req  = JsonSerializer.Deserialize<PortCheckRequest>(body, _jo);
@@ -544,7 +542,7 @@ public static class ApiServer
             await ctx.Response.WriteAsync(json);
         });
 
-        app.MapPost("/api/backup/restore-selective", async ctx =>
+        app.MapPost("/api/backup/restore-selective", async Task<IResult> (HttpContext ctx) =>
         {
             var body   = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
             var req    = JsonNode.Parse(body) as JsonObject;
