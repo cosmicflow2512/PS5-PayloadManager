@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>PS5AutoPayloadTool</AssemblyName>
     <RootNamespace>PS5AutoPayloadTool</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <Company>cosmicflow2512</Company>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <Product>PS5 AutoPayload Tool</Product>
@@ -20,19 +20,29 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-
-    <!-- Trim unused code to keep exe smaller -->
     <PublishTrimmed>false</PublishTrimmed>
-
-    <!-- Embed all PDBs into the exe -->
     <DebugType>embedded</DebugType>
-
-    <!-- No console window -->
     <Platforms>AnyCPU;x64</Platforms>
+
+    <!-- Embed wwwroot files as resources -->
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
   </PropertyGroup>
 
   <ItemGroup>
     <Resource Include="Assets\icon.ico"/>
+  </ItemGroup>
+
+  <!-- Embed wwwroot as embedded resources -->
+  <ItemGroup>
+    <EmbeddedResource Include="wwwroot\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
 </Project>
