@@ -12,6 +12,7 @@
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
       <RowDefinition Height="*"/>
       <RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
@@ -23,22 +24,28 @@
         <TextBlock x:Name="CountBadge" Foreground="{StaticResource TextMuted}" FontSize="13" Margin="10,4,0,0" VerticalAlignment="Bottom"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-        <Button Content="↻ Refresh"    Style="{StaticResource BtnSecondary}" Click="OnRefresh"     Margin="0,0,8,0"/>
+        <Button x:Name="BtnCheckUpdates" Content="↻ Check Updates" Style="{StaticResource BtnSecondary}"
+                Click="OnCheckUpdates" Margin="0,0,8,0"/>
+        <Button Content="↻ Refresh"     Style="{StaticResource BtnSecondary}" Click="OnRefresh" Margin="0,0,8,0"/>
         <Button Content="+ Add Payload" Style="{StaticResource BtnSecondary}" Click="OnUpload"/>
       </StackPanel>
     </Grid>
 
+    <!-- Update-check status line -->
+    <TextBlock x:Name="UpdateStatusText" Grid.Row="1" Margin="0,0,0,8"
+               Visibility="Collapsed" FontSize="12"/>
+
     <!-- Filter tabs + search -->
-    <Grid Grid.Row="1" Margin="0,0,0,10">
+    <Grid Grid.Row="2" Margin="0,0,0,10">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto"/>
         <ColumnDefinition Width="*"/>
       </Grid.ColumnDefinitions>
       <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,12,0">
-        <RadioButton x:Name="FAll"  Content="All"       Style="{StaticResource NavButton}" GroupName="PF" IsChecked="True" Click="OnFilter" Tag="all"      Padding="12,6"/>
+        <RadioButton x:Name="FAll"  Content="All"          Style="{StaticResource NavButton}" GroupName="PF" IsChecked="True" Click="OnFilter" Tag="all" Padding="12,6"/>
         <RadioButton x:Name="FFav"  Content="⭐ Favorites" Style="{StaticResource NavButton}" GroupName="PF" Click="OnFilter" Tag="fav"  Padding="12,6"/>
-        <RadioButton x:Name="FElf"  Content="ELF"       Style="{StaticResource NavButton}" GroupName="PF" Click="OnFilter" Tag="elf"      Padding="12,6"/>
-        <RadioButton x:Name="FLua"  Content="LUA"       Style="{StaticResource NavButton}" GroupName="PF" Click="OnFilter" Tag="lua"      Padding="12,6"/>
+        <RadioButton x:Name="FElf"  Content="ELF"          Style="{StaticResource NavButton}" GroupName="PF" Click="OnFilter" Tag="elf"  Padding="12,6"/>
+        <RadioButton x:Name="FLua"  Content="LUA"          Style="{StaticResource NavButton}" GroupName="PF" Click="OnFilter" Tag="lua"  Padding="12,6"/>
       </StackPanel>
       <Grid Grid.Column="1">
         <Grid.ColumnDefinitions>
@@ -52,7 +59,7 @@
     </Grid>
 
     <!-- Bulk bar -->
-    <Border x:Name="BulkBar" Grid.Row="2" Visibility="Collapsed" Background="{StaticResource BgCard}"
+    <Border x:Name="BulkBar" Grid.Row="3" Visibility="Collapsed" Background="{StaticResource BgCard}"
             CornerRadius="6" Padding="12,8" Margin="0,0,0,8">
       <Grid>
         <TextBlock x:Name="BulkCount" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
@@ -63,20 +70,20 @@
     </Border>
 
     <!-- Payload list -->
-    <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+    <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto">
       <ItemsControl x:Name="PayloadsList">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Border x:Name="ItemBorder" Background="{StaticResource BgCard}" CornerRadius="8"
+            <Border Background="{StaticResource BgCard}" CornerRadius="8"
                     Padding="14,10" Margin="0,0,0,6">
               <StackPanel>
-                <!-- Top row: checkbox + badge + name + update + star + send + del -->
+
+                <!-- Top row: checkbox · badge · name · star · send · del -->
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
@@ -89,21 +96,17 @@
                   </Border>
                   <TextBlock Grid.Column="2" Text="{Binding Name}" Foreground="{StaticResource TextPrimary}"
                              FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
-                  <Border Grid.Column="3" Background="{StaticResource Warn}" CornerRadius="4"
-                          Padding="6,2" Margin="6,0" VerticalAlignment="Center"
-                          Visibility="{Binding UpdateBadgeVisibility}">
-                    <TextBlock Text="{Binding UpdateLabel}" Foreground="White" FontSize="10" FontWeight="Bold"/>
-                  </Border>
-                  <Button Grid.Column="4" Content="{Binding FavStar}" Click="OnToggleFav" Tag="{Binding Name}"
+                  <Button Grid.Column="3" Content="{Binding FavStar}" Click="OnToggleFav" Tag="{Binding Name}"
                           Background="Transparent" BorderThickness="0" FontSize="16"
                           Cursor="Hand" Padding="6,2" Margin="0,0,2,0"
                           Foreground="{Binding FavColor}"/>
-                  <Button Grid.Column="5" Content="▶ Send to PS5" Style="{StaticResource BtnPrimary}"
+                  <Button Grid.Column="4" Content="▶ Send to PS5" Style="{StaticResource BtnPrimary}"
                           Click="OnSend" Tag="{Binding Name}" Padding="10,5" Margin="0,0,4,0"/>
-                  <Button Grid.Column="6" Content="✕" Style="{StaticResource BtnDanger}"
+                  <Button Grid.Column="5" Content="✕" Style="{StaticResource BtnDanger}"
                           Click="OnDelete" Tag="{Binding Name}" Padding="8,5"/>
                 </Grid>
-                <!-- Meta row -->
+
+                <!-- Meta row: size · repo · version picker / text / local label -->
                 <Grid Margin="26,6,0,0">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -111,40 +114,57 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                   </Grid.ColumnDefinitions>
-                  <TextBlock Grid.Column="0" Text="{Binding SizeText}" Foreground="{StaticResource TextMuted}" FontSize="11"
-                             VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="1" Text=" • " Foreground="{StaticResource TextMuted}" FontSize="11"
-                             VerticalAlignment="Center"
+                  <TextBlock Grid.Column="0" Text="{Binding SizeText}"
+                             Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text=" • "
+                             Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center"
                              Visibility="{Binding HasRepo, Converter={StaticResource BoolToVis}}"/>
-                  <TextBlock Grid.Column="2" Text="{Binding RepoText}" Foreground="{StaticResource TextMuted}" FontSize="11"
-                             VerticalAlignment="Center"
+                  <TextBlock Grid.Column="2" Text="{Binding RepoText}"
+                             Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center"
                              Visibility="{Binding HasRepo, Converter={StaticResource BoolToVis}}"/>
-                  <!-- Version label + selector (remote, multi-version) -->
+
+                  <!-- Version selector: only when repo + multiple versions -->
                   <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0"
                               Visibility="{Binding HasVersions, Converter={StaticResource BoolToVis}}">
                     <TextBlock Text="ver:" Foreground="{StaticResource TextMuted}" FontSize="11"
                                VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <ComboBox x:Name="VersionCombo" ItemsSource="{Binding VersionTags}"
+                    <ComboBox ItemsSource="{Binding VersionTags}"
                               SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
                               SelectionChanged="OnVersionChanged" Tag="{Binding Name}"
-                              Padding="8,3" FontSize="11" MinWidth="110" MaxWidth="200"/>
+                              Padding="6,3" FontSize="11" MinWidth="110" MaxWidth="200"/>
                   </StackPanel>
-                  <!-- Version text (remote, single version) -->
+
+                  <!-- Version text: repo + single version -->
                   <TextBlock Grid.Column="4" Text="{Binding VersionText}"
                              Foreground="{StaticResource Accent}" FontSize="11" FontWeight="SemiBold"
                              VerticalAlignment="Center" Margin="8,0,0,0"
                              Visibility="{Binding SingleVersionVisibility}"/>
-                  <!-- Local label (no repo) -->
+
+                  <!-- Local label -->
                   <TextBlock Grid.Column="4" Text="local"
                              Foreground="{StaticResource TextMuted}" FontSize="11"
                              VerticalAlignment="Center" Margin="8,0,0,0"
                              Visibility="{Binding LocalVisibility}"/>
-                  <TextBlock Grid.Column="5" Foreground="{StaticResource Success}" FontSize="11" FontWeight="SemiBold"
-                             Margin="8,0,0,0" VerticalAlignment="Center"
-                             Visibility="{Binding UpToDateVisibility}">✓ Up to date</TextBlock>
                 </Grid>
+
+                <!-- Update row: shown when an update is available for this payload -->
+                <Border Margin="26,6,0,0" Background="{StaticResource BgPrimary}"
+                        CornerRadius="6" Padding="10,6"
+                        Visibility="{Binding UpdateBadgeVisibility}">
+                  <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <TextBlock Text="↑ Update available: " Foreground="{StaticResource Warn}"
+                                 FontSize="12" VerticalAlignment="Center"/>
+                      <TextBlock Text="{Binding UpdateLabel}" Foreground="{StaticResource Warn}"
+                                 FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <Button Content="Update now" Style="{StaticResource BtnPrimary}"
+                            Click="OnUpdateOne" Tag="{Binding Name}"
+                            HorizontalAlignment="Right" Padding="12,4"/>
+                  </Grid>
+                </Border>
+
               </StackPanel>
             </Border>
           </DataTemplate>
@@ -152,13 +172,15 @@
       </ItemsControl>
     </ScrollViewer>
 
-    <!-- Update all bar -->
-    <Border x:Name="UpdateAllBar" Grid.Row="4" Visibility="Collapsed" Background="{StaticResource BgCard}"
+    <!-- Update-all bar: shown when 1+ updates available -->
+    <Border x:Name="UpdateAllBar" Grid.Row="5" Visibility="Collapsed" Background="{StaticResource BgCard}"
             CornerRadius="6" Padding="12,8" Margin="0,8,0,0">
       <Grid>
         <TextBlock x:Name="UpdateAllText" Foreground="{StaticResource Warn}" VerticalAlignment="Center"/>
-        <Button Content="Update All" Style="{StaticResource BtnPrimary}" HorizontalAlignment="Right" Click="OnUpdateAll"/>
+        <Button Content="Update All" Style="{StaticResource BtnPrimary}" HorizontalAlignment="Right"
+                Click="OnUpdateAll"/>
       </Grid>
     </Border>
+
   </Grid>
 </UserControl>

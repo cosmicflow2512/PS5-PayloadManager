@@ -30,7 +30,7 @@ public class GitHubClient
         var result = new List<ReleaseAsset>();
         try
         {
-            var releases = await GetJsonArrayAsync($"https://api.github.com/repos/{repo}/releases?per_page=3");
+            var releases = await GetJsonArrayAsync($"https://api.github.com/repos/{repo}/releases?per_page=10");
             foreach (var rel in releases ?? [])
             {
                 var tag  = rel?["tag_name"]?.GetValue<string>() ?? "";
