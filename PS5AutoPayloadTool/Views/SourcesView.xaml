@@ -6,29 +6,39 @@
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
       <RowDefinition Height="*"/>
     </Grid.RowDefinitions>
 
     <!-- Header -->
-    <Grid Grid.Row="0" Margin="0,0,0,20">
-      <TextBlock Text="Payload Sources" Foreground="{StaticResource TextPrimary}" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"/>
+    <Grid Grid.Row="0" Margin="0,0,0,16">
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <TextBlock Text="Payload Sources" Foreground="{StaticResource TextPrimary}" FontSize="22" FontWeight="SemiBold"/>
+        <TextBlock x:Name="CountBadge" Foreground="{StaticResource TextMuted}" FontSize="13" Margin="10,4,0,0" VerticalAlignment="Bottom"/>
+      </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-        <Button x:Name="BtnCheckUpdates" Content="Check Updates" Style="{StaticResource BtnSecondary}" Margin="0,0,8,0" Click="OnCheckUpdates"/>
-        <Button x:Name="BtnAddSource"    Content="+ Add Source"  Style="{StaticResource BtnPrimary}"   Click="OnAddSource"/>
+        <Button Content="↻ Check Updates" Style="{StaticResource BtnSecondary}" Click="OnCheckUpdates" Margin="0,0,8,0"/>
+        <Button Content="+ Add Source"    Style="{StaticResource BtnPrimary}"   Click="OnAddSource"/>
       </StackPanel>
     </Grid>
 
-    <!-- Add/edit panel -->
-    <Border x:Name="AddPanel" Grid.Row="1" Visibility="Collapsed" Background="{StaticResource BgCard}" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+    <!-- Update status -->
+    <TextBlock x:Name="UpdateStatus" Grid.Row="1" Foreground="{StaticResource Success}"
+               Margin="0,0,0,10" Visibility="Collapsed"/>
+
+    <!-- Add/Edit panel -->
+    <Border x:Name="AddPanel" Grid.Row="2" Visibility="Collapsed" Background="{StaticResource BgCard}"
+            CornerRadius="8" Padding="16" Margin="0,0,0,16">
       <StackPanel>
-        <TextBlock x:Name="PanelTitle" Text="Add Source" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Margin="0,0,0,12"/>
+        <TextBlock x:Name="PanelTitle" Text="Add Source" Foreground="{StaticResource Accent}"
+                   FontWeight="SemiBold" FontSize="14" Margin="0,0,0,12"/>
         <Grid Margin="0,0,0,8">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="*"/>
           </Grid.ColumnDefinitions>
           <StackPanel Grid.Column="0" Margin="0,0,6,0">
-            <TextBlock Text="Repository (owner/repo)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
+            <TextBlock Text="Repository (owner/repo or URL)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
             <TextBox x:Name="RepoInput"/>
           </StackPanel>
           <StackPanel Grid.Column="1" Margin="6,0,0,0">
@@ -37,35 +47,75 @@
           </StackPanel>
         </Grid>
         <StackPanel Margin="0,0,0,8">
-          <TextBlock Text="Filter (e.g. *.elf, etheriaRPC)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
+          <TextBlock Text="File Filter (e.g. *.elf, kstuff*)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
           <TextBox x:Name="FilterInput"/>
         </StackPanel>
-        <TextBlock x:Name="StatusText" Foreground="{StaticResource TextMuted}" Margin="0,4,0,4"/>
+        <TextBlock x:Name="ScanStatus" Foreground="{StaticResource TextMuted}" Margin="0,4,0,8"/>
+
+        <!-- Detected payloads -->
+        <Border x:Name="DetectedPanel" Visibility="Collapsed" Background="{StaticResource BgPrimary}"
+                CornerRadius="6" Padding="12" Margin="0,0,0,10">
+          <StackPanel>
+            <Grid Margin="0,0,0,8">
+              <TextBlock x:Name="DetectedCount" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Select All" Style="{StaticResource BtnSecondary}" Click="OnSelectAllDetected" Padding="8,4" Margin="0,0,4,0" FontSize="11"/>
+                <Button Content="Deselect"   Style="{StaticResource BtnSecondary}" Click="OnDeselectDetected"  Padding="8,4" FontSize="11"/>
+              </StackPanel>
+            </Grid>
+            <ItemsControl x:Name="DetectedList">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <CheckBox Grid.Column="0" IsChecked="{Binding IsChecked}" Margin="0,0,8,0"/>
+                    <Border Grid.Column="1" Background="{Binding BadgeColor}" CornerRadius="3" Padding="5,2" Margin="0,0,6,0">
+                      <TextBlock Text="{Binding ExtUpper}" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                    </Border>
+                    <TextBlock Grid.Column="2" Text="{Binding Name}" Foreground="{StaticResource TextPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="3" Text="{Binding Version}" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
         <StackPanel Orientation="Horizontal">
-          <Button Content="Fetch / Add" Style="{StaticResource BtnPrimary}" Click="OnFetch" Margin="0,0,8,0"/>
-          <Button Content="Cancel"      Style="{StaticResource BtnSecondary}" Click="OnCancel"/>
+          <Button x:Name="BtnFetch"  Content="Fetch"         Style="{StaticResource BtnPrimary}"   Click="OnFetch"  Margin="0,0,8,0"/>
+          <Button x:Name="BtnSave"   Content="Save Changes"  Style="{StaticResource BtnSecondary}" Click="OnSave"   Visibility="Collapsed" Margin="0,0,8,0"/>
+          <Button x:Name="BtnImport" Content="Import Selected" Style="{StaticResource BtnPrimary}" Click="OnImport" Visibility="Collapsed" IsEnabled="False" Margin="0,0,8,0"/>
+          <Button Content="Cancel"   Style="{StaticResource BtnSecondary}" Click="OnCancel"/>
         </StackPanel>
       </StackPanel>
     </Border>
 
     <!-- Sources list -->
-    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+    <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
       <ItemsControl x:Name="SourcesList">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Border Background="{StaticResource BgCard}" CornerRadius="8" Padding="16" Margin="0,0,0,8">
+            <Border Background="{StaticResource BgCard}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
               <Grid>
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*"/>
                   <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
-                  <TextBlock Text="{Binding Repo}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="14"/>
-                  <TextBlock Text="{Binding SubText}" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                  <TextBlock Text="{Binding Display}" Foreground="{StaticResource TextPrimary}"
+                             FontWeight="SemiBold" FontSize="14"/>
+                  <TextBlock Text="{Binding SubText}" Foreground="{StaticResource TextMuted}"
+                             FontSize="11" Margin="0,2,0,0"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                  <Button Content="Scan"   Style="{StaticResource BtnSecondary}" Click="OnScan"   Tag="{Binding Repo}" Margin="0,0,4,0"/>
-                  <Button Content="Delete" Style="{StaticResource BtnDanger}"    Click="OnDelete" Tag="{Binding Repo}"/>
+                  <Button Content="↻ Check" Style="{StaticResource BtnSecondary}" Click="OnScanOne" Tag="{Binding Repo}" Padding="10,5" Margin="0,0,4,0"/>
+                  <Button Content="Edit"    Style="{StaticResource BtnSecondary}" Click="OnEdit"    Tag="{Binding Repo}" Padding="10,5" Margin="0,0,4,0"/>
+                  <Button Content="Delete"  Style="{StaticResource BtnDanger}"    Click="OnDelete"  Tag="{Binding Repo}" Padding="10,5"/>
                 </StackPanel>
               </Grid>
             </Border>

@@ -5,31 +5,97 @@
   <Grid Margin="24">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
       <RowDefinition Height="*"/>
     </Grid.RowDefinitions>
 
-    <TextBlock Grid.Row="0" Text="Saved Flows" Foreground="{StaticResource TextPrimary}"
-               FontSize="22" FontWeight="SemiBold" Margin="0,0,0,20"/>
+    <!-- Header -->
+    <Grid Grid.Row="0" Margin="0,0,0,16">
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <TextBlock Text="Saved Flows" Foreground="{StaticResource TextPrimary}" FontSize="22" FontWeight="SemiBold"/>
+        <TextBlock x:Name="CountBadge" Foreground="{StaticResource TextMuted}" FontSize="13" Margin="10,4,0,0" VerticalAlignment="Bottom"/>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <CheckBox x:Name="ContinueOnError" Content="Continue on error" Foreground="{StaticResource TextMuted}"
+                  FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0"/>
+        <Button Content="↻ Refresh" Style="{StaticResource BtnSecondary}" Click="OnRefresh"/>
+      </StackPanel>
+    </Grid>
 
-    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+    <!-- Running indicator bar -->
+    <Border x:Name="RunningBar" Grid.Row="1" Visibility="Collapsed"
+            Background="{StaticResource BgCard}" CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
+      <Grid>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Ellipse Width="8" Height="8" Fill="{StaticResource Success}" Margin="0,0,8,0">
+            <Ellipse.RenderTransform><ScaleTransform/></Ellipse.RenderTransform>
+          </Ellipse>
+          <TextBlock Text="Running: " Foreground="{StaticResource TextMuted}" FontSize="12"/>
+          <TextBlock x:Name="RunningName" Foreground="{StaticResource Success}" FontWeight="SemiBold" FontSize="12"/>
+        </StackPanel>
+        <Button Content="⏹ Stop" Style="{StaticResource BtnDanger}" HorizontalAlignment="Right"
+                Click="OnStopCurrent" Padding="12,5"/>
+      </Grid>
+    </Border>
+
+    <!-- Profiles list -->
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
       <ItemsControl x:Name="ProfilesList">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
             <Border Background="{StaticResource BgCard}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
               <Grid>
                 <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
                   <ColumnDefinition Width="*"/>
                   <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
-                  <TextBlock Text="{Binding DisplayName}" Foreground="{StaticResource TextPrimary}"
-                             FontWeight="SemiBold" FontSize="14"/>
+
+                <!-- Favorite star -->
+                <Button Grid.Column="0" Content="{Binding FavStar}" Foreground="{Binding FavColor}"
+                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                        Click="OnToggleFav" Tag="{Binding Filename}"
+                        FontSize="18" Padding="0,0,10,0" VerticalAlignment="Center">
+                  <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                      <ContentPresenter/>
+                    </ControlTemplate>
+                  </Button.Template>
+                </Button>
+
+                <!-- Info -->
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding DisplayName}" Foreground="{StaticResource TextPrimary}"
+                               FontWeight="SemiBold" FontSize="14"/>
+                    <!-- Running dot -->
+                    <Border Background="{StaticResource Success}" CornerRadius="10" Padding="6,2" Margin="8,2,0,0"
+                            Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}">
+                      <TextBlock Text="● running" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                    </Border>
+                  </StackPanel>
                   <TextBlock Text="{Binding Info}" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                 </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                  <Button Content="Edit"   Style="{StaticResource BtnSecondary}" Click="OnEdit"   Tag="{Binding Filename}" Margin="0,0,4,0"/>
-                  <Button Content="Run"    Style="{StaticResource BtnPrimary}"   Click="OnRun"    Tag="{Binding Filename}" Margin="0,0,4,0"/>
-                  <Button Content="Delete" Style="{StaticResource BtnDanger}"    Click="OnDelete" Tag="{Binding Filename}"/>
+
+                <!-- Actions -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                  <Button Content="Edit"         Style="{StaticResource BtnSecondary}" Click="OnEdit"   Tag="{Binding Filename}" Padding="10,5" Margin="0,0,4,0"/>
+                  <Button Content="{Binding RunLabel}" Background="{Binding RunColor}" Foreground="White"
+                          BorderThickness="0" Cursor="Hand" Click="OnRun" Tag="{Binding Filename}" Padding="10,5" Margin="0,0,4,0">
+                    <Button.Template>
+                      <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                          <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bd" Property="Opacity" Value="0.85"/>
+                          </Trigger>
+                        </ControlTemplate.Triggers>
+                      </ControlTemplate>
+                    </Button.Template>
+                  </Button>
+                  <Button Content="Delete" Style="{StaticResource BtnDanger}" Click="OnDelete" Tag="{Binding Filename}" Padding="10,5"/>
                 </StackPanel>
               </Grid>
             </Border>

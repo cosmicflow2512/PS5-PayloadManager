@@ -43,6 +43,54 @@ public static class Storage
         catch { }
     }
 
+    // ── Favorites ────────────────────────────────────────────────────────────
+
+    public static List<string> LoadPayloadFavs()
+    {
+        var state = LoadUiState();
+        return state["payloadFavs"]?.Deserialize<List<string>>() ?? [];
+    }
+
+    public static void SavePayloadFavs(List<string> favs)
+    {
+        var state = LoadUiState();
+        state["payloadFavs"] = JsonNode.Parse(JsonSerializer.Serialize(favs));
+        SaveUiState(state);
+    }
+
+    public static List<string> LoadProfileFavs()
+    {
+        var state = LoadUiState();
+        return state["profileFavs"]?.Deserialize<List<string>>() ?? [];
+    }
+
+    public static void SaveProfileFavs(List<string> favs)
+    {
+        var state = LoadUiState();
+        state["profileFavs"] = JsonNode.Parse(JsonSerializer.Serialize(favs));
+        SaveUiState(state);
+    }
+
+    public static string LoadPs5Ip()
+        => LoadUiState()["ps5_ip"]?.GetValue<string>() ?? "";
+
+    public static void SavePs5Ip(string ip)
+    {
+        var state = LoadUiState();
+        state["ps5_ip"] = ip;
+        SaveUiState(state);
+    }
+
+    // ── Sources update ────────────────────────────────────────────────────────
+
+    public static void UpdateSource(SourceEntry updated)
+    {
+        var sources = LoadSources();
+        var idx = sources.FindIndex(s => s.Repo == updated.Repo);
+        if (idx >= 0) sources[idx] = updated;
+        SaveSources(sources);
+    }
+
     // ── Devices ──────────────────────────────────────────────────────────────
 
     public static List<DeviceEntry> LoadDevices()

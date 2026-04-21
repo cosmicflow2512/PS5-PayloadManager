@@ -4,6 +4,7 @@
              StartupUri="MainWindow.xaml">
   <Application.Resources>
     <ResourceDictionary>
+      <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
       <!-- Dark theme colors -->
       <SolidColorBrush x:Key="BgPrimary"   Color="#1B2331"/>

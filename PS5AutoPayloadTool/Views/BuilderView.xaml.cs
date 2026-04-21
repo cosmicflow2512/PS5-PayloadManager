@@ -1,22 +1,32 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
+using System.IO.Compression;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using Microsoft.Win32;
 using PS5AutoPayloadTool.Core;
 
 namespace PS5AutoPayloadTool.Views;
 
 public partial class BuilderView : UserControl
 {
-    public ObservableCollection<StepRow> Rows { get; } = [];
+    private readonly ObservableCollection<StepVM> _rows = [];
     private readonly List<FlowStep> _steps = [];
+    private Point _dragStart;
+    private StepVM? _dragging;
+    private bool _isDragging;
 
     public BuilderView()
     {
         InitializeComponent();
-        StepsList.ItemsSource = Rows;
+        StepsList.ItemsSource = _rows;
         LogBus.OnStateChange += (state, _) => Dispatcher.Invoke(() =>
         {
-            RunButton.Content = state is ExecEngine.Running or ExecEngine.Paused ? "Stop" : "Run";
+            RunButton.Content = state is ExecEngine.Running or ExecEngine.Paused ? "⏹ Stop" : "▶ Run";
         });
         Refresh();
     }
@@ -26,16 +36,16 @@ public partial class BuilderView : UserControl
         PayloadCombo.ItemsSource = Storage.ListPayloads().Select(p => p.Name).ToList();
     }
 
-    private void OnAddPayload(object sender, RoutedEventArgs e)  => ShowPanel("payload");
-    private void OnAddDelay(object sender, RoutedEventArgs e)    => ShowPanel("delay");
-    private void OnAddWait(object sender, RoutedEventArgs e)     => ShowPanel("wait");
+    private void OnAddPayload(object sender, RoutedEventArgs e) => ShowPanel("payload");
+    private void OnAddDelay(object sender, RoutedEventArgs e)   => ShowPanel("delay");
+    private void OnAddWait(object sender, RoutedEventArgs e)    => ShowPanel("wait");
 
     private void ShowPanel(string which)
     {
-        AddPanel.Visibility = Visibility.Visible;
-        PayloadAdd.Visibility = which == "payload" ? Visibility.Visible : Visibility.Collapsed;
-        DelayAdd.Visibility   = which == "delay"   ? Visibility.Visible : Visibility.Collapsed;
-        WaitAdd.Visibility    = which == "wait"    ? Visibility.Visible : Visibility.Collapsed;
+        AddPanel.Visibility      = Visibility.Visible;
+        PayloadAddPanel.Visibility = which == "payload" ? Visibility.Visible : Visibility.Collapsed;
+        DelayAddPanel.Visibility   = which == "delay"   ? Visibility.Visible : Visibility.Collapsed;
+        WaitAddPanel.Visibility    = which == "wait"    ? Visibility.Visible : Visibility.Collapsed;
         if (which == "payload") Refresh();
     }
 
@@ -70,13 +80,13 @@ public partial class BuilderView : UserControl
     {
         if (!int.TryParse(WaitPort.Text, out var port)) { MessageBox.Show("Enter a port."); return; }
         var timeout  = double.TryParse(WaitTimeout.Text,  out var t) ? t : 60.0;
-        var interval = int.TryParse(WaitInterval.Text, out var i) ? i : 500;
+        var interval = int.TryParse(WaitInterval.Text, out var iv) ? iv : 500;
         _steps.Add(new FlowStep { Type = "wait_port", Port = port, Timeout = timeout, IntervalMs = interval });
         AddPanel.Visibility = Visibility.Collapsed;
         Rebuild();
     }
 
-    private void OnUp(object sender, RoutedEventArgs e)
+    private void OnStepUp(object sender, RoutedEventArgs e)
     {
         if (sender is Button b && int.TryParse(b.Tag?.ToString(), out var i) && i > 0)
         {
@@ -85,7 +95,7 @@ public partial class BuilderView : UserControl
         }
     }
 
-    private void OnDown(object sender, RoutedEventArgs e)
+    private void OnStepDown(object sender, RoutedEventArgs e)
     {
         if (sender is Button b && int.TryParse(b.Tag?.ToString(), out var i) && i < _steps.Count - 1)
         {
@@ -94,7 +104,7 @@ public partial class BuilderView : UserControl
         }
     }
 
-    private void OnRemove(object sender, RoutedEventArgs e)
+    private void OnStepRemove(object sender, RoutedEventArgs e)
     {
         if (sender is Button b && int.TryParse(b.Tag?.ToString(), out var i) && i >= 0 && i < _steps.Count)
         {
@@ -103,41 +113,119 @@ public partial class BuilderView : UserControl
         }
     }
 
-    private void Rebuild()
+    private void OnStepEdit(object sender, RoutedEventArgs e)
     {
-        Rows.Clear();
-        for (int i = 0; i < _steps.Count; i++)
+        if (sender is not Button b || !int.TryParse(b.Tag?.ToString(), out var i)) return;
+        foreach (var r in _rows) r.EditVisible = Visibility.Collapsed;
+        if (i < _rows.Count)
         {
-            var s = _steps[i];
-            Rows.Add(new StepRow
-            {
-                IndexNum = i,
-                Index = $"{i + 1}.",
-                Label = s.Type switch
-                {
-                    "payload"  => "▶ " + s.Filename,
-                    "delay"    => "⏱ Delay",
-                    "wait_port"=> "⧖ Wait for port",
-                    _ => s.Type
-                },
-                Detail = s.Type switch
-                {
-                    "payload"   => $"Port {s.PortOverride ?? s.AutoPort}" + (string.IsNullOrEmpty(s.Version) ? "" : $" • {s.Version}"),
-                    "delay"     => $"{s.Ms} ms",
-                    "wait_port" => $"port {s.Port}, up to {s.Timeout}s (poll {s.IntervalMs}ms)",
-                    _ => ""
-                }
-            });
+            var row = _rows[i];
+            row.EditPayloads = Storage.ListPayloads().Select(p => p.Name).ToList();
+            row.EditFilename = _steps[i].Filename ?? "";
+            row.EditPort     = _steps[i].PortOverride?.ToString() ?? "";
+            row.EditVisible  = Visibility.Visible;
         }
+    }
+
+    private void OnStepEditConfirm(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button b || !int.TryParse(b.Tag?.ToString(), out var i)) return;
+        if (i >= _steps.Count || i >= _rows.Count) return;
+        var row = _rows[i];
+        _steps[i].Filename = row.EditFilename;
+        _steps[i].PortOverride = int.TryParse(row.EditPort, out var p) ? p : null;
+        _steps[i].AutoPort     = AutoloadParser.ResolveDefaultPort(_steps[i].Filename ?? "");
+        row.EditVisible = Visibility.Collapsed;
+        Rebuild();
+    }
+
+    private void OnStepEditCancel(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button b && int.TryParse(b.Tag?.ToString(), out var i) && i < _rows.Count)
+            _rows[i].EditVisible = Visibility.Collapsed;
+    }
+
+    // ── Drag-drop reordering ──────────────────────────────────────────────────
+
+    private void OnStepMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragStart  = e.GetPosition(StepsList);
+        _dragging   = (e.OriginalSource as FrameworkElement)?.DataContext as StepVM;
+        _isDragging = false;
+    }
+
+    private void OnStepMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _dragging == null || _isDragging) return;
+        var pos  = e.GetPosition(StepsList);
+        var diff = _dragStart - pos;
+        if (Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance &&
+            Math.Abs(diff.X) < SystemParameters.MinimumHorizontalDragDistance) return;
+        _isDragging = true;
+        DragDrop.DoDragDrop(StepsList, _dragging, DragDropEffects.Move);
+        _isDragging = false;
+        _dragging   = null;
+    }
+
+    private void OnStepDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(typeof(StepVM)) ? DragDropEffects.Move : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnStepDrop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(typeof(StepVM))) return;
+        var dragged = (StepVM)e.Data.GetData(typeof(StepVM));
+        var target  = (e.OriginalSource as FrameworkElement)?.DataContext as StepVM;
+        if (target == null || target == dragged) return;
+        int from = dragged.Index;
+        int to   = target.Index;
+        if (from < 0 || from >= _steps.Count || to < 0 || to >= _steps.Count) return;
+        var item = _steps[from];
+        _steps.RemoveAt(from);
+        _steps.Insert(to, item);
+        Rebuild();
+    }
+
+    // ── Save / Export / Run ───────────────────────────────────────────────────
+
+    private void OnExportZip(object sender, RoutedEventArgs e)
+    {
+        if (_steps.Count == 0) { MessageBox.Show("No steps to export."); return; }
+        var dlg = new SaveFileDialog { Filter = "ZIP archive|*.zip", FileName = "autoload.zip" };
+        if (dlg.ShowDialog() != true) return;
+
+        var content = AutoloadParser.StepsToContent(_steps);
+        using var ms  = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true))
+        {
+            var entry = zip.CreateEntry("autoload.txt");
+            using var sw = new StreamWriter(entry.Open());
+            sw.Write(content);
+
+            foreach (var step in _steps.Where(s => s.Type == "payload" && !string.IsNullOrEmpty(s.Filename)))
+            {
+                var src = Path.Combine(AppPaths.PayloadsDir, step.Filename!);
+                if (!File.Exists(src)) continue;
+                var ze = zip.CreateEntry(step.Filename!);
+                using var zs = ze.Open();
+                using var fs = File.OpenRead(src);
+                fs.CopyTo(zs);
+            }
+        }
+        File.WriteAllBytes(dlg.FileName, ms.ToArray());
+        LogBus.Log($"Exported ZIP → {dlg.FileName}", LogLevel.Success);
     }
 
     private void OnSave(object sender, RoutedEventArgs e)
     {
         var name = ProfileName.Text.Trim();
-        if (string.IsNullOrEmpty(name)) { MessageBox.Show("Enter profile name."); return; }
+        if (string.IsNullOrEmpty(name)) { MessageBox.Show("Enter a profile name."); return; }
         var content = AutoloadParser.StepsToContent(_steps);
         Storage.WriteProfile(name, content);
         LogBus.Log($"Saved profile '{name}'", LogLevel.Success);
+        MessageBox.Show($"Profile '{name}' saved.", "Saved", MessageBoxButton.OK, MessageBoxImage.None);
     }
 
     private async void OnRun(object sender, RoutedEventArgs e)
@@ -147,10 +235,10 @@ public partial class BuilderView : UserControl
             ExecEngine.RequestStop();
             return;
         }
-        var ip = Storage.LoadUiState()["ps5_ip"]?.GetValue<string>() ?? "";
+        var ip = Storage.LoadPs5Ip();
         if (string.IsNullOrEmpty(ip)) { MessageBox.Show("Set PS5 IP in Settings first."); return; }
         var content = AutoloadParser.StepsToContent(_steps);
-        if (string.IsNullOrWhiteSpace(content)) { MessageBox.Show("Empty flow."); return; }
+        if (string.IsNullOrWhiteSpace(content)) { MessageBox.Show("No steps in flow."); return; }
         await ExecEngine.RunAsync(ip, content, continueOnError: false, profileName: ProfileName.Text.Trim());
     }
 
@@ -185,12 +273,93 @@ public partial class BuilderView : UserControl
         }
         Rebuild();
     }
+
+    // ── Rebuild ───────────────────────────────────────────────────────────────
+
+    private static readonly Brush _payloadColor = new SolidColorBrush(Color.FromRgb(59, 130, 246));
+    private static readonly Brush _delayColor   = new SolidColorBrush(Color.FromRgb(245, 158, 11));
+    private static readonly Brush _waitColor    = new SolidColorBrush(Color.FromRgb(16, 185, 129));
+
+    private void Rebuild()
+    {
+        _rows.Clear();
+        for (int i = 0; i < _steps.Count; i++)
+        {
+            var s = _steps[i];
+            var (typeLabel, typeColor, mainText, subText) = s.Type switch
+            {
+                "payload" => (
+                    "PAYLOAD",
+                    _payloadColor,
+                    s.Filename ?? "",
+                    $"Port {s.PortOverride ?? s.AutoPort}" + (!string.IsNullOrEmpty(s.Version) ? $" • {s.Version}" : "")
+                ),
+                "delay" => (
+                    "DELAY",
+                    _delayColor,
+                    $"{s.Ms} ms",
+                    "pause between steps"
+                ),
+                "wait_port" => (
+                    "WAIT",
+                    _waitColor,
+                    $"Port {s.Port}",
+                    $"up to {s.Timeout}s · poll {s.IntervalMs}ms"
+                ),
+                _ => (s.Type.ToUpper(), _waitColor, s.Type, "")
+            };
+
+            _rows.Add(new StepVM
+            {
+                Index      = i,
+                IndexLabel = $"{i + 1}.",
+                TypeLabel  = typeLabel,
+                TypeColor  = typeColor,
+                MainText   = mainText,
+                SubText    = subText,
+                IsPayload  = s.Type == "payload",
+                EditVisible = Visibility.Collapsed,
+            });
+        }
+        StepCount.Text = _steps.Count > 0 ? $"{_steps.Count} step{(_steps.Count != 1 ? "s" : "")}" : "";
+    }
 }
 
-public class StepRow
+public class StepVM : INotifyPropertyChanged
 {
-    public int    IndexNum { get; set; }
-    public string Index    { get; set; } = "";
-    public string Label    { get; set; } = "";
-    public string Detail   { get; set; } = "";
+    private Visibility _editVisible = Visibility.Collapsed;
+    private string _editFilename = "";
+    private string _editPort = "";
+
+    public int    Index      { get; set; }
+    public string IndexLabel { get; set; } = "";
+    public Brush  TypeColor  { get; set; } = Brushes.Gray;
+    public string TypeLabel  { get; set; } = "";
+    public string MainText   { get; set; } = "";
+    public string SubText    { get; set; } = "";
+    public bool   IsPayload  { get; set; }
+
+    public List<string> EditPayloads { get; set; } = [];
+
+    public Visibility EditVisible
+    {
+        get => _editVisible;
+        set { _editVisible = value; OnPropertyChanged(); }
+    }
+
+    public string EditFilename
+    {
+        get => _editFilename;
+        set { _editFilename = value; OnPropertyChanged(); }
+    }
+
+    public string EditPort
+    {
+        get => _editPort;
+        set { _editPort = value; OnPropertyChanged(); }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged([CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }

@@ -2,57 +2,146 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{StaticResource BgPrimary}">
+  <UserControl.Resources>
+    <SolidColorBrush x:Key="BadgeElf" Color="#3B82F6"/>
+    <SolidColorBrush x:Key="BadgeLua" Color="#8B5CF6"/>
+    <SolidColorBrush x:Key="BadgeBin" Color="#6B7280"/>
+  </UserControl.Resources>
   <Grid Margin="24">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
       <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
 
-    <Grid Grid.Row="0" Margin="0,0,0,20">
-      <TextBlock Text="Payloads" Foreground="{StaticResource TextPrimary}" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"/>
+    <!-- Header -->
+    <Grid Grid.Row="0" Margin="0,0,0,16">
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <TextBlock Text="Payloads" Foreground="{StaticResource TextPrimary}" FontSize="22" FontWeight="SemiBold"/>
+        <TextBlock x:Name="CountBadge" Foreground="{StaticResource TextMuted}" FontSize="13" Margin="10,4,0,0" VerticalAlignment="Bottom"/>
+      </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-        <Button Content="Upload…" Style="{StaticResource BtnSecondary}" Click="OnUpload" Margin="0,0,8,0"/>
-        <Button Content="Refresh" Style="{StaticResource BtnSecondary}" Click="OnRefresh"/>
+        <Button Content="↻ Refresh"    Style="{StaticResource BtnSecondary}" Click="OnRefresh"     Margin="0,0,8,0"/>
+        <Button Content="+ Add Payload" Style="{StaticResource BtnSecondary}" Click="OnUpload"/>
       </StackPanel>
     </Grid>
 
-    <Grid Grid.Row="1" Margin="0,0,0,16">
+    <!-- Filter tabs + search -->
+    <Grid Grid.Row="1" Margin="0,0,0,10">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*"/>
         <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="*"/>
       </Grid.ColumnDefinitions>
-      <TextBox x:Name="SearchBox" Grid.Column="0" TextChanged="OnSearch"/>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0">
-        <RadioButton x:Name="FilterAll" Content="All"  Style="{StaticResource NavButton}" GroupName="Filter" IsChecked="True" Click="OnFilter" Tag="all"/>
-        <RadioButton x:Name="FilterElf" Content="ELF"  Style="{StaticResource NavButton}" GroupName="Filter" Click="OnFilter" Tag="elf"/>
-        <RadioButton x:Name="FilterLua" Content="LUA"  Style="{StaticResource NavButton}" GroupName="Filter" Click="OnFilter" Tag="lua"/>
+      <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,12,0">
+        <RadioButton x:Name="FAll"  Content="All"       Style="{StaticResource NavButton}" GroupName="PF" IsChecked="True" Click="OnFilter" Tag="all"      Padding="12,6"/>
+        <RadioButton x:Name="FFav"  Content="⭐ Favorites" Style="{StaticResource NavButton}" GroupName="PF" Click="OnFilter" Tag="fav"  Padding="12,6"/>
+        <RadioButton x:Name="FElf"  Content="ELF"       Style="{StaticResource NavButton}" GroupName="PF" Click="OnFilter" Tag="elf"      Padding="12,6"/>
+        <RadioButton x:Name="FLua"  Content="LUA"       Style="{StaticResource NavButton}" GroupName="PF" Click="OnFilter" Tag="lua"      Padding="12,6"/>
       </StackPanel>
+      <Grid Grid.Column="1">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <CheckBox x:Name="SelectAllCb" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0" Click="OnSelectAll"/>
+        <TextBox  x:Name="SearchBox"   Grid.Column="1" TextChanged="OnSearch"/>
+      </Grid>
     </Grid>
 
-    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+    <!-- Bulk bar -->
+    <Border x:Name="BulkBar" Grid.Row="2" Visibility="Collapsed" Background="{StaticResource BgCard}"
+            CornerRadius="6" Padding="12,8" Margin="0,0,0,8">
+      <Grid>
+        <TextBlock x:Name="BulkCount" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button Content="Delete Selected" Style="{StaticResource BtnDanger}" Click="OnBulkDelete"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Payload list -->
+    <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
       <ItemsControl x:Name="PayloadsList">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Border Background="{StaticResource BgCard}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*"/>
-                  <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
-                  <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="14"/>
-                  <TextBlock Text="{Binding Info}" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
-                </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                  <Button Content="Send"   Style="{StaticResource BtnPrimary}"   Click="OnSend"   Tag="{Binding Name}" Margin="0,0,4,0"/>
-                  <Button Content="Delete" Style="{StaticResource BtnDanger}"    Click="OnDelete" Tag="{Binding Name}"/>
-                </StackPanel>
-              </Grid>
+            <Border x:Name="ItemBorder" Background="{StaticResource BgCard}" CornerRadius="8"
+                    Padding="14,10" Margin="0,0,0,6">
+              <StackPanel>
+                <!-- Top row: checkbox + badge + name + update + star + send + del -->
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center"
+                            Margin="0,0,8,0" Click="OnItemSelect" Tag="{Binding Name}"/>
+                  <Border Grid.Column="1" Background="{Binding BadgeColor}" CornerRadius="3"
+                          Padding="5,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding ExtUpper}" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                  </Border>
+                  <TextBlock Grid.Column="2" Text="{Binding Name}" Foreground="{StaticResource TextPrimary}"
+                             FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                  <Border Grid.Column="3" Background="{StaticResource Warn}" CornerRadius="4"
+                          Padding="6,2" Margin="6,0" VerticalAlignment="Center"
+                          Visibility="{Binding UpdateBadgeVisibility}">
+                    <TextBlock Text="{Binding UpdateLabel}" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                  </Border>
+                  <Button Grid.Column="4" Content="{Binding FavStar}" Click="OnToggleFav" Tag="{Binding Name}"
+                          Background="Transparent" BorderThickness="0" FontSize="16"
+                          Cursor="Hand" Padding="6,2" Margin="0,0,2,0"
+                          Foreground="{Binding FavColor}"/>
+                  <Button Grid.Column="5" Content="▶ Send to PS5" Style="{StaticResource BtnPrimary}"
+                          Click="OnSend" Tag="{Binding Name}" Padding="10,5" Margin="0,0,4,0"/>
+                  <Button Grid.Column="6" Content="✕" Style="{StaticResource BtnDanger}"
+                          Click="OnDelete" Tag="{Binding Name}" Padding="8,5"/>
+                </Grid>
+                <!-- Meta row -->
+                <Grid Margin="26,6,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0" Text="{Binding SizeText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                  <TextBlock Grid.Column="1" Text=" • " Foreground="{StaticResource TextMuted}" FontSize="11"
+                             Visibility="{Binding HasRepo, Converter={StaticResource BoolToVis}}"/>
+                  <TextBlock Grid.Column="2" Text="{Binding RepoText}" Foreground="{StaticResource TextMuted}" FontSize="11"
+                             Visibility="{Binding HasRepo, Converter={StaticResource BoolToVis}}"/>
+                  <!-- Version selector -->
+                  <ComboBox Grid.Column="3" x:Name="VersionCombo" ItemsSource="{Binding VersionTags}"
+                            SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
+                            Visibility="{Binding HasVersions, Converter={StaticResource BoolToVis}}"
+                            SelectionChanged="OnVersionChanged" Tag="{Binding Name}"
+                            Margin="8,0,0,0" Padding="6,2" FontSize="11"
+                            Background="{StaticResource BgCard}" Foreground="{StaticResource TextPrimary}"
+                            BorderBrush="{StaticResource Border}" MaxWidth="160"/>
+                  <TextBlock Grid.Column="4" Foreground="{StaticResource Success}" FontSize="11" FontWeight="SemiBold"
+                             Margin="8,0,0,0" VerticalAlignment="Center"
+                             Visibility="{Binding UpToDateVisibility}">✓ Up to date</TextBlock>
+                </Grid>
+              </StackPanel>
             </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
     </ScrollViewer>
+
+    <!-- Update all bar -->
+    <Border x:Name="UpdateAllBar" Grid.Row="4" Visibility="Collapsed" Background="{StaticResource BgCard}"
+            CornerRadius="6" Padding="12,8" Margin="0,8,0,0">
+      <Grid>
+        <TextBlock x:Name="UpdateAllText" Foreground="{StaticResource Warn}" VerticalAlignment="Center"/>
+        <Button Content="Update All" Style="{StaticResource BtnPrimary}" HorizontalAlignment="Right" Click="OnUpdateAll"/>
+      </Grid>
+    </Border>
   </Grid>
 </UserControl>

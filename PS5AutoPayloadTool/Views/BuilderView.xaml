@@ -11,80 +11,227 @@
       <RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
 
-    <TextBlock Grid.Row="0" Text="Auto-Load Builder" Foreground="{StaticResource TextPrimary}" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,20"/>
-
-    <Grid Grid.Row="1" Margin="0,0,0,12">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*"/>
-        <ColumnDefinition Width="*"/>
-      </Grid.ColumnDefinitions>
-      <StackPanel Grid.Column="0" Margin="0,0,6,0">
-        <TextBlock Text="Profile name" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
-        <TextBox x:Name="ProfileName"/>
-      </StackPanel>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
-        <Button Content="+ Payload" Style="{StaticResource BtnSecondary}" Click="OnAddPayload" Margin="0,0,4,0"/>
-        <Button Content="+ Delay"   Style="{StaticResource BtnSecondary}" Click="OnAddDelay"   Margin="0,0,4,0"/>
-        <Button Content="+ Wait"    Style="{StaticResource BtnSecondary}" Click="OnAddWait"/>
+    <!-- Header -->
+    <Grid Grid.Row="0" Margin="0,0,0,16">
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <TextBlock Text="Auto-Load Builder" Foreground="{StaticResource TextPrimary}" FontSize="22" FontWeight="SemiBold"/>
+        <TextBlock x:Name="StepCount" Foreground="{StaticResource TextMuted}" FontSize="13" Margin="10,4,0,0" VerticalAlignment="Bottom"/>
       </StackPanel>
     </Grid>
 
+    <!-- Step type buttons -->
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+      <Button x:Name="BtnAddPayload" Click="OnAddPayload" Margin="0,0,8,0" Padding="14,7"
+              Background="{StaticResource Accent}" Foreground="White" BorderThickness="0" Cursor="Hand">
+        <Button.Template>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{StaticResource AccentHover}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Button.Template>
+        <TextBlock Text="+ Payload" Foreground="White" FontWeight="SemiBold"/>
+      </Button>
+      <Button x:Name="BtnAddDelay" Click="OnAddDelay" Margin="0,0,8,0" Padding="14,7"
+              Background="{StaticResource BgCard}" Foreground="{StaticResource TextPrimary}" BorderThickness="0" Cursor="Hand">
+        <Button.Template>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="bd" Property="Background" Value="{StaticResource BgHover}"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Button.Template>
+        <TextBlock Text="+ Delay" Foreground="{StaticResource TextPrimary}"/>
+      </Button>
+      <Button x:Name="BtnAddWait" Click="OnAddWait" Padding="14,7"
+              Background="{StaticResource BgCard}" Foreground="{StaticResource TextPrimary}" BorderThickness="0" Cursor="Hand">
+        <Button.Template>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="bd" Property="Background" Value="{StaticResource BgHover}"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Button.Template>
+        <TextBlock Text="+ Wait Port" Foreground="{StaticResource TextPrimary}"/>
+      </Button>
+    </StackPanel>
+
     <!-- Add panel -->
-    <Border x:Name="AddPanel" Grid.Row="2" Visibility="Collapsed" Background="{StaticResource BgCard}" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+    <Border x:Name="AddPanel" Grid.Row="2" Visibility="Collapsed" Background="{StaticResource BgCard}"
+            CornerRadius="8" Padding="14" Margin="0,0,0,12">
       <StackPanel>
-        <StackPanel x:Name="PayloadAdd" Orientation="Horizontal">
-          <ComboBox x:Name="PayloadCombo" Width="300" Margin="0,0,8,0"/>
-          <Button Content="Add" Style="{StaticResource BtnPrimary}" Click="OnAddPayloadConfirm"/>
+        <!-- Payload picker -->
+        <StackPanel x:Name="PayloadAddPanel">
+          <TextBlock Text="Select payload" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <ComboBox x:Name="PayloadCombo" Grid.Column="0" Margin="0,0,8,0"
+                      Background="{StaticResource BgCard}" Foreground="{StaticResource TextPrimary}"
+                      BorderBrush="{StaticResource Border}"/>
+            <Button Grid.Column="1" Content="Add" Style="{StaticResource BtnPrimary}" Click="OnAddPayloadConfirm" Padding="14,6"/>
+          </Grid>
         </StackPanel>
-        <StackPanel x:Name="DelayAdd" Orientation="Horizontal" Visibility="Collapsed">
-          <TextBox x:Name="DelayMs" Width="150" Margin="0,0,8,0"/>
-          <Button Content="100ms" Style="{StaticResource BtnSecondary}" Tag="100" Click="OnDelayPreset" Margin="0,0,4,0"/>
-          <Button Content="500ms" Style="{StaticResource BtnSecondary}" Tag="500" Click="OnDelayPreset" Margin="0,0,4,0"/>
-          <Button Content="1s"    Style="{StaticResource BtnSecondary}" Tag="1000" Click="OnDelayPreset" Margin="0,0,4,0"/>
-          <Button Content="5s"    Style="{StaticResource BtnSecondary}" Tag="5000" Click="OnDelayPreset" Margin="0,0,8,0"/>
-          <Button Content="Add"   Style="{StaticResource BtnPrimary}"   Click="OnAddDelayConfirm"/>
+        <!-- Delay picker -->
+        <StackPanel x:Name="DelayAddPanel" Visibility="Collapsed">
+          <TextBlock Text="Delay (milliseconds)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
+          <StackPanel Orientation="Horizontal">
+            <TextBox x:Name="DelayMs" Width="100" Margin="0,0,8,0"/>
+            <Button Content="100ms" Style="{StaticResource BtnSecondary}" Tag="100"  Click="OnDelayPreset" Margin="0,0,4,0" Padding="8,5"/>
+            <Button Content="500ms" Style="{StaticResource BtnSecondary}" Tag="500"  Click="OnDelayPreset" Margin="0,0,4,0" Padding="8,5"/>
+            <Button Content="1s"    Style="{StaticResource BtnSecondary}" Tag="1000" Click="OnDelayPreset" Margin="0,0,4,0" Padding="8,5"/>
+            <Button Content="5s"    Style="{StaticResource BtnSecondary}" Tag="5000" Click="OnDelayPreset" Margin="0,0,8,0" Padding="8,5"/>
+            <Button Content="Add"   Style="{StaticResource BtnPrimary}"   Click="OnAddDelayConfirm"        Margin="0,0,0,0" Padding="14,5"/>
+          </StackPanel>
         </StackPanel>
-        <StackPanel x:Name="WaitAdd" Orientation="Horizontal" Visibility="Collapsed">
-          <TextBox x:Name="WaitPort"     Width="90" Margin="0,0,4,0"/>
-          <TextBox x:Name="WaitTimeout"  Width="90" Margin="0,0,4,0"/>
-          <TextBox x:Name="WaitInterval" Width="90" Margin="0,0,8,0"/>
-          <Button Content="Add" Style="{StaticResource BtnPrimary}" Click="OnAddWaitConfirm"/>
+        <!-- Wait-port picker -->
+        <StackPanel x:Name="WaitAddPanel" Visibility="Collapsed">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Margin="0,0,6,0">
+              <TextBlock Text="Port" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
+              <TextBox x:Name="WaitPort"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="0,0,6,0">
+              <TextBlock Text="Timeout (s)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
+              <TextBox x:Name="WaitTimeout" Text="90"/>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Margin="0,0,8,0">
+              <TextBlock Text="Interval (ms)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
+              <TextBox x:Name="WaitInterval" Text="500"/>
+            </StackPanel>
+            <Button Grid.Column="3" Content="Add" Style="{StaticResource BtnPrimary}"
+                    VerticalAlignment="Bottom" Click="OnAddWaitConfirm" Padding="14,6"/>
+          </Grid>
         </StackPanel>
       </StackPanel>
     </Border>
 
-    <!-- Steps list -->
-    <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
-      <ItemsControl x:Name="StepsList">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate>
-            <Border Background="{StaticResource BgCard}" CornerRadius="8" Padding="12" Margin="0,0,0,6">
-              <Grid>
+    <!-- Steps list (drag-drop enabled ListView) -->
+    <ListView x:Name="StepsList" Grid.Row="3" Background="Transparent" BorderThickness="0"
+              AllowDrop="True" SelectionMode="Single"
+              PreviewMouseLeftButtonDown="OnStepMouseDown"
+              PreviewMouseMove="OnStepMouseMove"
+              Drop="OnStepDrop" DragOver="OnStepDragOver">
+      <ListView.ItemContainerStyle>
+        <Style TargetType="ListViewItem">
+          <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+          <Setter Property="Background" Value="Transparent"/>
+          <Setter Property="BorderThickness" Value="0"/>
+          <Setter Property="Padding" Value="0,0,0,6"/>
+          <Setter Property="Template">
+            <Setter.Value>
+              <ControlTemplate TargetType="ListViewItem">
+                <ContentPresenter Margin="{TemplateBinding Padding}"/>
+              </ControlTemplate>
+            </Setter.Value>
+          </Setter>
+        </Style>
+      </ListView.ItemContainerStyle>
+      <ListView.ItemTemplate>
+        <DataTemplate>
+          <Border Background="{StaticResource BgCard}" CornerRadius="8" Padding="12,10">
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+              </Grid.RowDefinitions>
+              <!-- Main row -->
+              <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="40"/>
+                  <ColumnDefinition Width="24"/>
+                  <ColumnDefinition Width="28"/>
+                  <ColumnDefinition Width="Auto"/>
                   <ColumnDefinition Width="*"/>
                   <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding Index}" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                <StackPanel Grid.Column="1">
-                  <TextBlock Text="{Binding Label}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
-                  <TextBlock Text="{Binding Detail}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                <!-- Drag handle -->
+                <TextBlock Grid.Column="0" Text="⠿" Foreground="{StaticResource TextMuted}"
+                           FontSize="16" VerticalAlignment="Center" Cursor="SizeAll" Margin="0,0,4,0"/>
+                <!-- Step number -->
+                <TextBlock Grid.Column="1" Text="{Binding IndexLabel}" Foreground="{StaticResource TextMuted}"
+                           FontSize="12" VerticalAlignment="Center"/>
+                <!-- Type badge -->
+                <Border Grid.Column="2" Background="{Binding TypeColor}" CornerRadius="4"
+                        Padding="7,3" Margin="0,0,10,0" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding TypeLabel}" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                </Border>
+                <!-- Content -->
+                <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding MainText}" Foreground="{StaticResource TextPrimary}"
+                             FontWeight="SemiBold" FontSize="13"/>
+                  <TextBlock Text="{Binding SubText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
                 </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal">
-                  <Button Content="▲" Style="{StaticResource BtnSecondary}" Click="OnUp"     Tag="{Binding IndexNum}" Margin="0,0,4,0" Padding="8,4"/>
-                  <Button Content="▼" Style="{StaticResource BtnSecondary}" Click="OnDown"   Tag="{Binding IndexNum}" Margin="0,0,4,0" Padding="8,4"/>
-                  <Button Content="✕" Style="{StaticResource BtnDanger}"    Click="OnRemove" Tag="{Binding IndexNum}" Padding="8,4"/>
+                <!-- Buttons -->
+                <StackPanel Grid.Column="4" Orientation="Horizontal">
+                  <Button Content="Edit" Style="{StaticResource BtnSecondary}" Click="OnStepEdit" Tag="{Binding Index}"
+                          Padding="8,4" Margin="0,0,4,0" FontSize="11"
+                          Visibility="{Binding IsPayload, Converter={StaticResource BoolToVis}}"/>
+                  <Button Content="▲" Style="{StaticResource BtnSecondary}" Click="OnStepUp"   Tag="{Binding Index}" Padding="8,4" Margin="0,0,2,0"/>
+                  <Button Content="▼" Style="{StaticResource BtnSecondary}" Click="OnStepDown" Tag="{Binding Index}" Padding="8,4" Margin="0,0,4,0"/>
+                  <Button Content="✕" Style="{StaticResource BtnDanger}"    Click="OnStepRemove" Tag="{Binding Index}" Padding="8,4"/>
                 </StackPanel>
               </Grid>
-            </Border>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-    </ScrollViewer>
+              <!-- Inline edit row (payload step) -->
+              <Border Grid.Row="1" x:Name="EditRow" Visibility="{Binding EditVisible}"
+                      Background="{StaticResource BgPrimary}" CornerRadius="6" Padding="10,8" Margin="32,8,0,0">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <ComboBox Grid.Column="0" ItemsSource="{Binding EditPayloads}"
+                            SelectedItem="{Binding EditFilename, Mode=TwoWay}"
+                            Background="{StaticResource BgCard}" Foreground="{StaticResource TextPrimary}"
+                            BorderBrush="{StaticResource Border}" Margin="0,0,8,0"/>
+                  <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                    <TextBlock Text="Port override" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,0,0,2"/>
+                    <TextBox Text="{Binding EditPort, Mode=TwoWay}" Background="{StaticResource BgCard}"
+                             Foreground="{StaticResource TextPrimary}" BorderBrush="{StaticResource Border}"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <Button Content="✔" Style="{StaticResource BtnPrimary}" Click="OnStepEditConfirm" Tag="{Binding Index}" Padding="10,5" Margin="0,0,4,0"/>
+                    <Button Content="✕" Style="{StaticResource BtnSecondary}" Click="OnStepEditCancel" Tag="{Binding Index}" Padding="10,5"/>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </Grid>
+          </Border>
+        </DataTemplate>
+      </ListView.ItemTemplate>
+    </ListView>
 
-    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-      <Button Content="Save as Profile" Style="{StaticResource BtnSecondary}" Click="OnSave" Margin="0,0,8,0"/>
-      <Button x:Name="RunButton" Content="Run"   Style="{StaticResource BtnPrimary}"   Click="OnRun"/>
-    </StackPanel>
+    <!-- Bottom bar: profile name, save, run, export -->
+    <Grid Grid.Row="4" Margin="0,16,0,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <TextBox x:Name="ProfileName" Grid.Column="0" Margin="0,0,8,0"/>
+      <StackPanel Grid.Column="1" Orientation="Horizontal">
+        <Button Content="Export ZIP" Style="{StaticResource BtnSecondary}" Click="OnExportZip" Margin="0,0,8,0"/>
+        <Button Content="Save as Profile" Style="{StaticResource BtnSecondary}" Click="OnSave" Margin="0,0,8,0"/>
+        <Button x:Name="RunButton" Content="▶ Run" Style="{StaticResource BtnPrimary}" Click="OnRun"/>
+      </StackPanel>
+    </Grid>
   </Grid>
 </UserControl>
