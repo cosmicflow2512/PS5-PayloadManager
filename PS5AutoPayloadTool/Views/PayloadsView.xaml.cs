@@ -211,7 +211,7 @@ public partial class PayloadsView : UserControl
             {
                 await File.WriteAllBytesAsync(Path.Combine(AppPaths.PayloadsDir, realName), data);
                 var meta = Storage.LoadPayloadMeta();
-                if (meta.TryGetValue(name, out var m)) { m.Version = tag; m.DownloadUrl = ver.DownloadUrl; Storage.SavePayloadMeta(meta); }
+                if (meta.TryGetValue(name, out var mx)) { mx.Version = tag; mx.DownloadUrl = ver.DownloadUrl; Storage.SavePayloadMeta(meta); }
                 LogBus.Log($"Switched {name} → {tag}", LogLevel.Success);
                 Refresh();
             }
