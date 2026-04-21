@@ -15,7 +15,9 @@ public partial class SourcesView : UserControl
     private readonly ObservableCollection<SourceRow> _rows = [];
     private readonly ObservableCollection<DetectedRow> _detected = [];
     private string? _editingRepo;
-    private List<ReleaseAsset> _detectedAssets = [];
+
+    // Maps deduplicated display key → all ReleaseAssets (latest first)
+    private Dictionary<string, List<ReleaseAsset>> _allVersionsMap = [];
 
     public SourcesView()
     {
@@ -33,17 +35,27 @@ public partial class SourcesView : UserControl
         {
             var parts = new List<string>();
             if (!string.IsNullOrEmpty(s.Filter)) parts.Add(s.Filter);
-            if (!string.IsNullOrEmpty(s.SourceType) && s.SourceType != "auto") parts.Add(s.SourceType);
-            if (!string.IsNullOrEmpty(s.Folder)) parts.Add(s.Folder);
+            if (!string.IsNullOrEmpty(s.Folder)) parts.Add("/" + s.Folder);
             _rows.Add(new SourceRow
             {
-                Repo    = s.Repo,
-                Display = string.IsNullOrEmpty(s.DisplayName) ? s.Repo : s.DisplayName,
-                SubText = parts.Count > 0 ? string.Join(" · ", parts) : "auto",
+                Repo     = s.Repo,
+                Display  = string.IsNullOrEmpty(s.DisplayName) ? s.Repo : s.DisplayName,
+                SubText  = parts.Count > 0 ? string.Join(" · ", parts) : (s.SourceType == "folder" ? "folder scan" : "latest releases"),
+                TypeIcon = s.SourceType == "folder" ? "📁" : "📦",
             });
         }
         CountBadge.Text = $"{_rows.Count} source{(_rows.Count != 1 ? "s" : "")}";
     }
+
+    // ── Source type toggle ────────────────────────────────────────────────────
+
+    private void OnSourceTypeChanged(object sender, RoutedEventArgs e)
+    {
+        if (FolderRow == null) return;
+        FolderRow.Visibility = TypeFolder.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // ── Add / Edit panel ──────────────────────────────────────────────────────
 
     private void OnAddSource(object sender, RoutedEventArgs e)
     {
@@ -51,13 +63,16 @@ public partial class SourcesView : UserControl
         { ClosePanel(); return; }
         _editingRepo = null;
         PanelTitle.Text = "Add Source";
-        RepoInput.Text = ""; DisplayInput.Text = ""; FilterInput.Text = "";
+        RepoInput.Text = ""; DisplayInput.Text = ""; FilterInput.Text = ""; FolderInput.Text = "";
+        TypeRelease.IsChecked = true;
+        FolderRow.Visibility = Visibility.Collapsed;
         ScanStatus.Text = "";
         BtnFetch.Visibility  = Visibility.Visible;
         BtnSave.Visibility   = Visibility.Collapsed;
         BtnImport.Visibility = Visibility.Collapsed;
         DetectedPanel.Visibility = Visibility.Collapsed;
         _detected.Clear();
+        _allVersionsMap.Clear();
         AddPanel.Visibility = Visibility.Visible;
         RepoInput.IsReadOnly = false;
     }
@@ -71,13 +86,18 @@ public partial class SourcesView : UserControl
         PanelTitle.Text = "Edit Source";
         RepoInput.Text = src.Repo; RepoInput.IsReadOnly = true;
         DisplayInput.Text = src.DisplayName ?? "";
-        FilterInput.Text = src.Filter ?? "";
+        FilterInput.Text  = src.Filter ?? "";
+        FolderInput.Text  = src.Folder ?? "";
+        TypeRelease.IsChecked = src.SourceType != "folder";
+        TypeFolder.IsChecked  = src.SourceType == "folder";
+        FolderRow.Visibility  = src.SourceType == "folder" ? Visibility.Visible : Visibility.Collapsed;
         ScanStatus.Text = "";
         BtnFetch.Visibility  = Visibility.Visible;
         BtnSave.Visibility   = Visibility.Visible;
         BtnImport.Visibility = Visibility.Collapsed;
         DetectedPanel.Visibility = Visibility.Collapsed;
         _detected.Clear();
+        _allVersionsMap.Clear();
         AddPanel.Visibility = Visibility.Visible;
     }
 
@@ -87,45 +107,86 @@ public partial class SourcesView : UserControl
     {
         AddPanel.Visibility = Visibility.Collapsed;
         _editingRepo = null;
-        _detectedAssets.Clear();
         _detected.Clear();
+        _allVersionsMap.Clear();
     }
+
+    // ── Fetch ─────────────────────────────────────────────────────────────────
 
     private async void OnFetch(object sender, RoutedEventArgs e)
     {
         var repo = NormalizeRepo(RepoInput.Text.Trim());
         if (string.IsNullOrEmpty(repo)) { ScanStatus.Text = "Enter a repository."; return; }
 
-        ScanStatus.Text = "Scanning …";
+        ScanStatus.Text = "Scanning…";
         ScanStatus.Foreground = (Brush)FindResource("TextMuted");
         BtnFetch.IsEnabled = false;
 
         try
         {
+            bool isFolder  = TypeFolder.IsChecked == true;
+            string sourceType = isFolder ? "folder" : "release";
+            string folder  = FolderInput.Text.Trim();
+            string filter  = FilterInput.Text.Trim();
+
+            // Persist source entry
             if (_editingRepo == null)
             {
                 var sources = Storage.LoadSources();
                 if (!sources.Any(s => s.Repo == repo))
-                    sources.Add(new SourceEntry { Repo = repo, Filter = FilterInput.Text.Trim(), DisplayName = DisplayInput.Text.Trim() });
+                    sources.Add(new SourceEntry { Repo = repo, Filter = filter, DisplayName = DisplayInput.Text.Trim(), SourceType = sourceType, Folder = folder });
                 Storage.SaveSources(sources);
             }
 
-            _detectedAssets = await _gh.GetReleasesAsync(repo, FilterInput.Text.Trim());
-            _detected.Clear();
-            foreach (var a in _detectedAssets)
+            // Fetch raw assets
+            List<ReleaseAsset> raw;
+            if (isFolder)
             {
-                var ext = System.IO.Path.GetExtension(a.Name).TrimStart('.').ToLower();
-                var displayName = a.IsZip ? System.IO.Path.GetFileNameWithoutExtension(a.Name) + " (zip)" : a.Name;
-                var badgeColor = ext switch { "lua" => (Brush)new SolidColorBrush(Color.FromRgb(139, 92, 246)), "elf" => new SolidColorBrush(Color.FromRgb(59, 130, 246)), _ => new SolidColorBrush(Color.FromRgb(107, 114, 128)) };
-                _detected.Add(new DetectedRow { Name = displayName, Version = a.Tag, IsChecked = true, BadgeColor = badgeColor, ExtUpper = ext.ToUpper() });
+                var files = await _gh.ScanRepoFilesAsync(repo, folder, filter);
+                raw = files.Select(f => new ReleaseAsset(
+                    Path.GetFileName(f.Path), f.DownloadUrl, "folder", "", 0, 0, "", false)).ToList();
+            }
+            else
+            {
+                raw = await _gh.GetReleasesAsync(repo, filter);
+            }
+
+            // Deduplicate: group by asset name (for zip: use base name), versions latest-first
+            _allVersionsMap = raw
+                .GroupBy(a => a.IsZip ? Path.GetFileNameWithoutExtension(a.Name) : a.Name)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            _detected.Clear();
+            foreach (var (key, versions) in _allVersionsMap)
+            {
+                var latest = versions[0];
+                var ext = Path.GetExtension(key).TrimStart('.').ToLower();
+                var extUpper = string.IsNullOrEmpty(ext) ? "BIN" : ext.ToUpper();
+                var displayName = latest.IsZip ? key + " (zip)" : key;
+                Brush badgeColor = ext switch
+                {
+                    "lua" => new SolidColorBrush(Color.FromRgb(139, 92, 246)),
+                    "elf" => new SolidColorBrush(Color.FromRgb(59, 130, 246)),
+                    _     => new SolidColorBrush(Color.FromRgb(107, 114, 128))
+                };
+
+                _detected.Add(new DetectedRow
+                {
+                    Name         = displayName,
+                    Version      = latest.Tag == "folder" ? "folder" : latest.Tag,
+                    VersionCount = versions.Count > 1 ? $"{versions.Count} versions" : "",
+                    IsChecked    = true,
+                    BadgeColor   = badgeColor,
+                    ExtUpper     = extUpper,
+                });
             }
 
             ScanStatus.Text = $"Found {_detected.Count} payload(s)";
             ScanStatus.Foreground = (Brush)FindResource("Success");
             DetectedPanel.Visibility = _detected.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            DetectedCount.Text = $"{_detected.Count} found";
-            BtnImport.Visibility  = _detected.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            BtnImport.IsEnabled   = _detected.Count > 0;
+            DetectedCount.Text       = $"{_detected.Count} found";
+            BtnImport.Visibility = _detected.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            BtnImport.IsEnabled  = _detected.Count > 0;
             LogBus.Log($"Source {repo}: found {_detected.Count} payload(s)", LogLevel.Success);
             Refresh();
         }
@@ -133,10 +194,12 @@ public partial class SourcesView : UserControl
         {
             ScanStatus.Text = "Error: " + ex.Message;
             ScanStatus.Foreground = (Brush)FindResource("Danger");
-            LogBus.Log("Add source error: " + ex.Message, LogLevel.Error);
+            LogBus.Log("Fetch source error: " + ex.Message, LogLevel.Error);
         }
         BtnFetch.IsEnabled = true;
     }
+
+    // ── Save (edit mode) ──────────────────────────────────────────────────────
 
     private void OnSave(object sender, RoutedEventArgs e)
     {
@@ -145,8 +208,10 @@ public partial class SourcesView : UserControl
         var src = sources.FirstOrDefault(s => s.Repo == _editingRepo);
         if (src != null)
         {
-            src.Filter = FilterInput.Text.Trim();
+            src.Filter      = FilterInput.Text.Trim();
             src.DisplayName = DisplayInput.Text.Trim();
+            src.SourceType  = TypeFolder.IsChecked == true ? "folder" : "release";
+            src.Folder      = FolderInput.Text.Trim();
             Storage.SaveSources(sources);
             LogBus.Log($"Source {_editingRepo} saved", LogLevel.Success);
         }
@@ -154,33 +219,63 @@ public partial class SourcesView : UserControl
         Refresh();
     }
 
+    // ── Import ────────────────────────────────────────────────────────────────
+
     private async void OnImport(object sender, RoutedEventArgs e)
     {
-        var toImport = _detected.Select((d, i) => (d, i)).Where(x => x.d.IsChecked).ToList();
+        var toImport = _detected.Where(d => d.IsChecked).ToList();
         if (toImport.Count == 0) return;
         BtnImport.IsEnabled = false;
         int imported = 0;
         var meta = Storage.LoadPayloadMeta();
-        foreach (var (row, idx) in toImport)
+
+        foreach (var row in toImport)
         {
-            if (idx >= _detectedAssets.Count) continue;
-            var a = _detectedAssets[idx];
+            // Strip " (zip)" suffix to find versions map key
+            var key = row.Name.EndsWith(" (zip)") ? row.Name[..^6] : row.Name;
+            if (!_allVersionsMap.TryGetValue(key, out var versions) || versions.Count == 0) continue;
+
+            var latest = versions[0];
             try
             {
-                var (data, realName) = await _gh.DownloadPayloadAsync(a.DownloadUrl, a.Name);
+                var (data, realName) = await _gh.DownloadPayloadAsync(latest.DownloadUrl, latest.Name);
                 if (data == null) continue;
                 await File.WriteAllBytesAsync(Path.Combine(AppPaths.PayloadsDir, realName), data);
-                meta[realName] = new PayloadMeta { Repo = NormalizeRepo(RepoInput.Text), Version = a.Tag, DownloadUrl = a.DownloadUrl, PublishedAt = a.PublishedAt, AssetSize = a.Size, ReleaseId = a.ReleaseId };
+
+                // Store all available versions so the version picker works
+                var allVers = versions
+                    .Where(v => v.Tag != "folder")
+                    .Select(v => new VersionEntry
+                    {
+                        Tag         = v.Tag,
+                        DownloadUrl = v.DownloadUrl,
+                        PublishedAt = v.PublishedAt,
+                        AssetSize   = v.Size,
+                    }).ToList();
+
+                meta[realName] = new PayloadMeta
+                {
+                    Repo        = NormalizeRepo(RepoInput.Text),
+                    Version     = latest.Tag == "folder" ? "" : latest.Tag,
+                    DownloadUrl = latest.DownloadUrl,
+                    PublishedAt = latest.PublishedAt,
+                    AssetSize   = latest.Size,
+                    ReleaseId   = latest.ReleaseId,
+                    AllVersions = allVers,
+                };
                 imported++;
             }
-            catch (Exception ex) { LogBus.Log($"Import {a.Name} failed: {ex.Message}", LogLevel.Error); }
+            catch (Exception ex) { LogBus.Log($"Import {latest.Name} failed: {ex.Message}", LogLevel.Error); }
         }
+
         Storage.SavePayloadMeta(meta);
         LogBus.Log($"Imported {imported} payload(s)", LogLevel.Success);
         ClosePanel();
         Refresh();
         BtnImport.IsEnabled = true;
     }
+
+    // ── Check updates ─────────────────────────────────────────────────────────
 
     private async void OnCheckUpdates(object sender, RoutedEventArgs e)
     {
@@ -190,7 +285,7 @@ public partial class SourcesView : UserControl
         try
         {
             var sources = Storage.LoadSources();
-            var meta = Storage.LoadPayloadMeta();
+            var meta    = Storage.LoadPayloadMeta();
             var updates = await _gh.CheckUpdatesAsync(sources, meta);
             if (updates.Count == 0)
             {
@@ -247,18 +342,20 @@ public partial class SourcesView : UserControl
 
 public class SourceRow
 {
-    public string Repo    { get; set; } = "";
-    public string Display { get; set; } = "";
-    public string SubText { get; set; } = "";
+    public string Repo     { get; set; } = "";
+    public string Display  { get; set; } = "";
+    public string SubText  { get; set; } = "";
+    public string TypeIcon { get; set; } = "📦";
 }
 
 public class DetectedRow : INotifyPropertyChanged
 {
     private bool _isChecked = true;
-    public string Name      { get; set; } = "";
-    public string Version   { get; set; } = "";
-    public string ExtUpper  { get; set; } = "";
-    public Brush  BadgeColor { get; set; } = Brushes.Gray;
+    public string Name         { get; set; } = "";
+    public string Version      { get; set; } = "";
+    public string VersionCount { get; set; } = "";
+    public string ExtUpper     { get; set; } = "";
+    public Brush  BadgeColor   { get; set; } = Brushes.Gray;
     public bool IsChecked
     {
         get => _isChecked;

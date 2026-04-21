@@ -150,21 +150,26 @@ public partial class BuilderView : UserControl
     private void OnStepMouseDown(object sender, MouseButtonEventArgs e)
     {
         _dragStart  = e.GetPosition(StepsList);
-        _dragging   = (e.OriginalSource as FrameworkElement)?.DataContext as StepVM;
+        _dragging   = FindStepVM(e.OriginalSource as DependencyObject);
         _isDragging = false;
     }
 
     private void OnStepMouseMove(object sender, MouseEventArgs e)
     {
-        if (e.LeftButton != MouseButtonState.Pressed || _dragging == null || _isDragging) return;
-        var pos  = e.GetPosition(StepsList);
-        var diff = _dragStart - pos;
-        if (Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance &&
-            Math.Abs(diff.X) < SystemParameters.MinimumHorizontalDragDistance) return;
+        if (_isDragging || e.LeftButton != MouseButtonState.Pressed || _dragging == null) return;
+        var pos = e.GetPosition(StepsList);
+        if (Math.Abs(pos.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance * 2 &&
+            Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance * 2) return;
         _isDragging = true;
-        DragDrop.DoDragDrop(StepsList, _dragging, DragDropEffects.Move);
-        _isDragging = false;
-        _dragging   = null;
+        try
+        {
+            DragDrop.DoDragDrop(StepsList, new DataObject(typeof(StepVM), _dragging), DragDropEffects.Move);
+        }
+        finally
+        {
+            _isDragging = false;
+            _dragging   = null;
+        }
     }
 
     private void OnStepDragOver(object sender, DragEventArgs e)
@@ -176,9 +181,9 @@ public partial class BuilderView : UserControl
     private void OnStepDrop(object sender, DragEventArgs e)
     {
         if (!e.Data.GetDataPresent(typeof(StepVM))) return;
-        var dragged = (StepVM)e.Data.GetData(typeof(StepVM));
-        var target  = (e.OriginalSource as FrameworkElement)?.DataContext as StepVM;
-        if (target == null || target == dragged) return;
+        var dragged = e.Data.GetData(typeof(StepVM)) as StepVM;
+        var target  = FindStepVM(e.OriginalSource as DependencyObject);
+        if (dragged == null || target == null || target.Index == dragged.Index) return;
         int from = dragged.Index;
         int to   = target.Index;
         if (from < 0 || from >= _steps.Count || to < 0 || to >= _steps.Count) return;
@@ -186,6 +191,18 @@ public partial class BuilderView : UserControl
         _steps.RemoveAt(from);
         _steps.Insert(to, item);
         Rebuild();
+    }
+
+    // Walk up the visual tree to find the nearest ancestor (or self) whose DataContext is StepVM
+    private static StepVM? FindStepVM(DependencyObject? obj)
+    {
+        while (obj != null)
+        {
+            if (obj is FrameworkElement fe && fe.DataContext is StepVM vm)
+                return vm;
+            obj = VisualTreeHelper.GetParent(obj);
+        }
+        return null;
     }
 
     // ── Save / Export / Run ───────────────────────────────────────────────────

@@ -95,7 +95,9 @@ public static class ExecEngine
     private static void ResumePause()
     {
         _paused = false;
-        try { _pauseGate.Release(); } catch { }
+        // Only release if semaphore was taken (count == 0), prevents SemaphoreFullException
+        if (_pauseGate.CurrentCount == 0)
+            try { _pauseGate.Release(); } catch { }
     }
 
     private static void SetState(string state, string profile)
