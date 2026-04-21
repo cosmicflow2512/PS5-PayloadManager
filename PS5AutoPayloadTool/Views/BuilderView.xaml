@@ -1,0 +1,90 @@
+<UserControl x:Class="PS5AutoPayloadTool.Views.BuilderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BgPrimary}">
+  <Grid Margin="24">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="Auto-Load Builder" Foreground="{StaticResource TextPrimary}" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,20"/>
+
+    <Grid Grid.Row="1" Margin="0,0,0,12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel Grid.Column="0" Margin="0,0,6,0">
+        <TextBlock Text="Profile name" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
+        <TextBox x:Name="ProfileName"/>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+        <Button Content="+ Payload" Style="{StaticResource BtnSecondary}" Click="OnAddPayload" Margin="0,0,4,0"/>
+        <Button Content="+ Delay"   Style="{StaticResource BtnSecondary}" Click="OnAddDelay"   Margin="0,0,4,0"/>
+        <Button Content="+ Wait"    Style="{StaticResource BtnSecondary}" Click="OnAddWait"/>
+      </StackPanel>
+    </Grid>
+
+    <!-- Add panel -->
+    <Border x:Name="AddPanel" Grid.Row="2" Visibility="Collapsed" Background="{StaticResource BgCard}" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+      <StackPanel>
+        <StackPanel x:Name="PayloadAdd" Orientation="Horizontal">
+          <ComboBox x:Name="PayloadCombo" Width="300" Margin="0,0,8,0"/>
+          <Button Content="Add" Style="{StaticResource BtnPrimary}" Click="OnAddPayloadConfirm"/>
+        </StackPanel>
+        <StackPanel x:Name="DelayAdd" Orientation="Horizontal" Visibility="Collapsed">
+          <TextBox x:Name="DelayMs" Width="150" Margin="0,0,8,0"/>
+          <Button Content="100ms" Style="{StaticResource BtnSecondary}" Tag="100" Click="OnDelayPreset" Margin="0,0,4,0"/>
+          <Button Content="500ms" Style="{StaticResource BtnSecondary}" Tag="500" Click="OnDelayPreset" Margin="0,0,4,0"/>
+          <Button Content="1s"    Style="{StaticResource BtnSecondary}" Tag="1000" Click="OnDelayPreset" Margin="0,0,4,0"/>
+          <Button Content="5s"    Style="{StaticResource BtnSecondary}" Tag="5000" Click="OnDelayPreset" Margin="0,0,8,0"/>
+          <Button Content="Add"   Style="{StaticResource BtnPrimary}"   Click="OnAddDelayConfirm"/>
+        </StackPanel>
+        <StackPanel x:Name="WaitAdd" Orientation="Horizontal" Visibility="Collapsed">
+          <TextBox x:Name="WaitPort"     Width="90" Margin="0,0,4,0"/>
+          <TextBox x:Name="WaitTimeout"  Width="90" Margin="0,0,4,0"/>
+          <TextBox x:Name="WaitInterval" Width="90" Margin="0,0,8,0"/>
+          <Button Content="Add" Style="{StaticResource BtnPrimary}" Click="OnAddWaitConfirm"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Steps list -->
+    <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+      <ItemsControl x:Name="StepsList">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border Background="{StaticResource BgCard}" CornerRadius="8" Padding="12" Margin="0,0,0,6">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="40"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Index}" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1">
+                  <TextBlock Text="{Binding Label}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+                  <TextBlock Text="{Binding Detail}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                  <Button Content="▲" Style="{StaticResource BtnSecondary}" Click="OnUp"     Tag="{Binding IndexNum}" Margin="0,0,4,0" Padding="8,4"/>
+                  <Button Content="▼" Style="{StaticResource BtnSecondary}" Click="OnDown"   Tag="{Binding IndexNum}" Margin="0,0,4,0" Padding="8,4"/>
+                  <Button Content="✕" Style="{StaticResource BtnDanger}"    Click="OnRemove" Tag="{Binding IndexNum}" Padding="8,4"/>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+      <Button Content="Save as Profile" Style="{StaticResource BtnSecondary}" Click="OnSave" Margin="0,0,8,0"/>
+      <Button x:Name="RunButton" Content="Run"   Style="{StaticResource BtnPrimary}"   Click="OnRun"/>
+    </StackPanel>
+  </Grid>
+</UserControl>

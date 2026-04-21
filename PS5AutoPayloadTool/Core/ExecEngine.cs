@@ -1,5 +1,4 @@
 using System.Threading;
-using PS5AutoPayloadTool.Server;
 
 namespace PS5AutoPayloadTool.Core;
 
@@ -28,7 +27,7 @@ public static class ExecEngine
 
         _cts    = new CancellationTokenSource();
         _paused = false;
-        await SetState(Running, profileName);
+        SetState(Running, profileName);
 
         var directives = AutoloadParser.Parse(profileContent);
         bool anyFail = false;
@@ -37,15 +36,13 @@ public static class ExecEngine
         {
             if (_cts.Token.IsCancellationRequested)
             {
-                await SetState(Stopped, profileName);
+                SetState(Stopped, profileName);
                 return;
             }
 
-            // Pause support
             if (_paused)
             {
-                await WsManager.BroadcastAsync("status",
-                    $"[{i + 1}/{directives.Count}] Paused …", "warn");
+                LogBus.Log($"[{i + 1}/{directives.Count}] Paused …", LogLevel.Warn);
                 await _pauseGate.WaitAsync(_cts.Token);
                 _pauseGate.Release();
             }
@@ -58,19 +55,19 @@ public static class ExecEngine
                 anyFail = true;
                 if (!continueOnError)
                 {
-                    await SetState(Failed, profileName);
+                    SetState(Failed, profileName);
                     return;
                 }
             }
 
             if (_cts.Token.IsCancellationRequested)
             {
-                await SetState(Stopped, profileName);
+                SetState(Stopped, profileName);
                 return;
             }
         }
 
-        await SetState(anyFail ? Failed : Completed, profileName);
+        SetState(anyFail ? Failed : Completed, profileName);
     }
 
     public static void RequestStop()
@@ -83,8 +80,8 @@ public static class ExecEngine
     {
         if (_state != Running) return;
         _paused = true;
-        _pauseGate.Wait(0); // drain one slot → gate closed
-        _ = SetState(Paused, _profile);
+        _pauseGate.Wait(0);
+        SetState(Paused, _profile);
     }
 
     public static void RequestResume()
@@ -92,10 +89,8 @@ public static class ExecEngine
         if (_state != Paused) return;
         _paused = false;
         try { _pauseGate.Release(); } catch { }
-        _ = SetState(Running, _profile);
+        SetState(Running, _profile);
     }
-
-    // ── Private ──────────────────────────────────────────────────────────────
 
     private static void ResumePause()
     {
@@ -103,11 +98,11 @@ public static class ExecEngine
         try { _pauseGate.Release(); } catch { }
     }
 
-    private static async Task SetState(string state, string profile)
+    private static void SetState(string state, string profile)
     {
         _state   = state;
         _profile = profile;
-        await WsManager.BroadcastAsync("exec_state", state, profile: profile);
+        LogBus.StateChange(state, profile);
     }
 
     private static async Task<bool> ExecuteDirectiveAsync(Directive d, string host,
@@ -117,33 +112,31 @@ public static class ExecEngine
         {
             case SendDirective send:
             {
-                await WsManager.BroadcastAsync("status",
-                    $"[{idx}/{total}] Sending {send.Filename} → {host}:{send.Port}", "info");
+                LogBus.Log($"[{idx}/{total}] Sending {send.Filename} -> {host}:{send.Port}", LogLevel.Info);
                 var (ok, msg, _) = await PayloadSender.SendAsync(host, send.Port, send.Filename, ct: ct);
-                await WsManager.BroadcastAsync("status",
-                    $"[{idx}/{total}] {(ok ? "✔ " : "✗ ")}{msg}", ok ? "success" : "error");
+                LogBus.Log($"[{idx}/{total}] {(ok ? "OK " : "FAIL ")}{msg}", ok ? LogLevel.Success : LogLevel.Error);
                 return ok;
             }
 
             case DelayDirective delay:
             {
-                await WsManager.BroadcastAsync("status",
-                    $"[{idx}/{total}] Delay {delay.Ms} ms …", "info");
+                LogBus.Log($"[{idx}/{total}] Delay {delay.Ms} ms", LogLevel.Info);
                 try { await Task.Delay(delay.Ms, ct); } catch (OperationCanceledException) { return false; }
                 return true;
             }
 
             case WaitPortDirective wait:
             {
-                await WsManager.BroadcastAsync("status",
-                    $"[{idx}/{total}] Waiting for {host}:{wait.Port} (up to {wait.Timeout}s) …", "info");
+                LogBus.Log($"[{idx}/{total}] Waiting for {host}:{wait.Port} (up to {wait.Timeout}s)", LogLevel.Info);
                 bool reached = await PortChecker.WaitAsync(host, wait.Port,
                     wait.Timeout, wait.IntervalMs / 1000.0, ct,
-                    async (e, t) => await WsManager.BroadcastAsync("status",
-                        $"[{idx}/{total}] Port {wait.Port}: {e:F0}s / {t}s …", "info"));
+                    (e, t) =>
+                    {
+                        LogBus.Log($"[{idx}/{total}] Port {wait.Port}: {e:F0}s / {t}s", LogLevel.Info);
+                        return Task.CompletedTask;
+                    });
 
-                await WsManager.BroadcastAsync("status",
-                    $"[{idx}/{total}] {(reached ? "✔ Port open" : "✗ Port timeout")}", reached ? "success" : "error");
+                LogBus.Log($"[{idx}/{total}] {(reached ? "Port open" : "Port timeout")}", reached ? LogLevel.Success : LogLevel.Error);
                 return reached;
             }
 

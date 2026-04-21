@@ -1,0 +1,77 @@
+<UserControl x:Class="PS5AutoPayloadTool.Views.SourcesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BgPrimary}">
+  <Grid Margin="24">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <!-- Header -->
+    <Grid Grid.Row="0" Margin="0,0,0,20">
+      <TextBlock Text="Payload Sources" Foreground="{StaticResource TextPrimary}" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"/>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <Button x:Name="BtnCheckUpdates" Content="Check Updates" Style="{StaticResource BtnSecondary}" Margin="0,0,8,0" Click="OnCheckUpdates"/>
+        <Button x:Name="BtnAddSource"    Content="+ Add Source"  Style="{StaticResource BtnPrimary}"   Click="OnAddSource"/>
+      </StackPanel>
+    </Grid>
+
+    <!-- Add/edit panel -->
+    <Border x:Name="AddPanel" Grid.Row="1" Visibility="Collapsed" Background="{StaticResource BgCard}" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+      <StackPanel>
+        <TextBlock x:Name="PanelTitle" Text="Add Source" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Margin="0,0,0,12"/>
+        <Grid Margin="0,0,0,8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0" Margin="0,0,6,0">
+            <TextBlock Text="Repository (owner/repo)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
+            <TextBox x:Name="RepoInput"/>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Margin="6,0,0,0">
+            <TextBlock Text="Display Name (optional)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
+            <TextBox x:Name="DisplayInput"/>
+          </StackPanel>
+        </Grid>
+        <StackPanel Margin="0,0,0,8">
+          <TextBlock Text="Filter (e.g. *.elf, etheriaRPC)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
+          <TextBox x:Name="FilterInput"/>
+        </StackPanel>
+        <TextBlock x:Name="StatusText" Foreground="{StaticResource TextMuted}" Margin="0,4,0,4"/>
+        <StackPanel Orientation="Horizontal">
+          <Button Content="Fetch / Add" Style="{StaticResource BtnPrimary}" Click="OnFetch" Margin="0,0,8,0"/>
+          <Button Content="Cancel"      Style="{StaticResource BtnSecondary}" Click="OnCancel"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Sources list -->
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+      <ItemsControl x:Name="SourcesList">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border Background="{StaticResource BgCard}" CornerRadius="8" Padding="16" Margin="0,0,0,8">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                  <TextBlock Text="{Binding Repo}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="14"/>
+                  <TextBlock Text="{Binding SubText}" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                  <Button Content="Scan"   Style="{StaticResource BtnSecondary}" Click="OnScan"   Tag="{Binding Repo}" Margin="0,0,4,0"/>
+                  <Button Content="Delete" Style="{StaticResource BtnDanger}"    Click="OnDelete" Tag="{Binding Repo}"/>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

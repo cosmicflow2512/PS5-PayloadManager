@@ -14,7 +14,6 @@
     <Product>PS5 AutoPayload Tool</Product>
     <Description>Windows payload sender tool for PS5 homebrew automation</Description>
 
-    <!-- Single-file self-contained publish -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -23,26 +22,10 @@
     <PublishTrimmed>false</PublishTrimmed>
     <DebugType>embedded</DebugType>
     <Platforms>AnyCPU;x64</Platforms>
-
-    <!-- Embed wwwroot files as resources -->
-    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
   </PropertyGroup>
 
   <ItemGroup>
     <Resource Include="Assets\icon.ico"/>
-  </ItemGroup>
-
-  <!-- Embed wwwroot as embedded resources -->
-  <ItemGroup>
-    <EmbeddedResource Include="wwwroot\**\*" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
 </Project>
