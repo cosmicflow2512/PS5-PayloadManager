@@ -174,12 +174,25 @@ public partial class BuilderView : UserControl
 
     private void OnStepDragOver(object sender, DragEventArgs e)
     {
-        e.Effects = e.Data.GetDataPresent(typeof(StepVM)) ? DragDropEffects.Move : DragDropEffects.None;
+        bool ok = e.Data.GetDataPresent(typeof(StepVM));
+        e.Effects = ok ? DragDropEffects.Move : DragDropEffects.None;
         e.Handled = true;
+        if (!ok) return;
+
+        var target = FindStepVM(e.OriginalSource as DependencyObject);
+        foreach (var r in _rows)
+            r.DropIndicatorVisibility = (target != null && r.Index == target.Index && _dragging != null && r.Index != _dragging.Index)
+                ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnStepDragLeave(object sender, DragEventArgs e)
+    {
+        foreach (var r in _rows) r.DropIndicatorVisibility = Visibility.Collapsed;
     }
 
     private void OnStepDrop(object sender, DragEventArgs e)
     {
+        foreach (var r in _rows) r.DropIndicatorVisibility = Visibility.Collapsed;
         if (!e.Data.GetDataPresent(typeof(StepVM))) return;
         var dragged = e.Data.GetData(typeof(StepVM)) as StepVM;
         var target  = FindStepVM(e.OriginalSource as DependencyObject);
@@ -345,6 +358,7 @@ public partial class BuilderView : UserControl
 public class StepVM : INotifyPropertyChanged
 {
     private Visibility _editVisible = Visibility.Collapsed;
+    private Visibility _dropIndicatorVisibility = Visibility.Collapsed;
     private string _editFilename = "";
     private string _editPort = "";
 
@@ -357,6 +371,12 @@ public class StepVM : INotifyPropertyChanged
     public bool   IsPayload  { get; set; }
 
     public List<string> EditPayloads { get; set; } = [];
+
+    public Visibility DropIndicatorVisibility
+    {
+        get => _dropIndicatorVisibility;
+        set { _dropIndicatorVisibility = value; OnPropertyChanged(); }
+    }
 
     public Visibility EditVisible
     {

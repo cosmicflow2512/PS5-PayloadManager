@@ -45,7 +45,8 @@
           <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <CheckBox x:Name="SelectAllCb" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0" Click="OnSelectAll"/>
+        <CheckBox x:Name="SelectAllCb" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0"
+                  Click="OnSelectAll" Content="Select all" Foreground="{StaticResource TextMuted}"/>
         <TextBox  x:Name="SearchBox"   Grid.Column="1" TextChanged="OnSearch"/>
       </Grid>
     </Grid>
@@ -110,21 +111,37 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                   </Grid.ColumnDefinitions>
-                  <TextBlock Grid.Column="0" Text="{Binding SizeText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                  <TextBlock Grid.Column="0" Text="{Binding SizeText}" Foreground="{StaticResource TextMuted}" FontSize="11"
+                             VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="1" Text=" • " Foreground="{StaticResource TextMuted}" FontSize="11"
+                             VerticalAlignment="Center"
                              Visibility="{Binding HasRepo, Converter={StaticResource BoolToVis}}"/>
                   <TextBlock Grid.Column="2" Text="{Binding RepoText}" Foreground="{StaticResource TextMuted}" FontSize="11"
+                             VerticalAlignment="Center"
                              Visibility="{Binding HasRepo, Converter={StaticResource BoolToVis}}"/>
-                  <!-- Version selector -->
-                  <ComboBox Grid.Column="3" x:Name="VersionCombo" ItemsSource="{Binding VersionTags}"
-                            SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
-                            Visibility="{Binding HasVersions, Converter={StaticResource BoolToVis}}"
-                            SelectionChanged="OnVersionChanged" Tag="{Binding Name}"
-                            Margin="8,0,0,0" Padding="6,2" FontSize="11"
-                            Background="{StaticResource BgCard}" Foreground="{StaticResource TextPrimary}"
-                            BorderBrush="{StaticResource Border}" MaxWidth="160"/>
-                  <TextBlock Grid.Column="4" Foreground="{StaticResource Success}" FontSize="11" FontWeight="SemiBold"
+                  <!-- Version label + selector (remote, multi-version) -->
+                  <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0"
+                              Visibility="{Binding HasVersions, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="ver:" Foreground="{StaticResource TextMuted}" FontSize="11"
+                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="VersionCombo" ItemsSource="{Binding VersionTags}"
+                              SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
+                              SelectionChanged="OnVersionChanged" Tag="{Binding Name}"
+                              Padding="8,3" FontSize="11" MinWidth="110" MaxWidth="200"/>
+                  </StackPanel>
+                  <!-- Version text (remote, single version) -->
+                  <TextBlock Grid.Column="4" Text="{Binding VersionText}"
+                             Foreground="{StaticResource Accent}" FontSize="11" FontWeight="SemiBold"
+                             VerticalAlignment="Center" Margin="8,0,0,0"
+                             Visibility="{Binding SingleVersionVisibility}"/>
+                  <!-- Local label (no repo) -->
+                  <TextBlock Grid.Column="4" Text="local"
+                             Foreground="{StaticResource TextMuted}" FontSize="11"
+                             VerticalAlignment="Center" Margin="8,0,0,0"
+                             Visibility="{Binding LocalVisibility}"/>
+                  <TextBlock Grid.Column="5" Foreground="{StaticResource Success}" FontSize="11" FontWeight="SemiBold"
                              Margin="8,0,0,0" VerticalAlignment="Center"
                              Visibility="{Binding UpToDateVisibility}">✓ Up to date</TextBlock>
                 </Grid>

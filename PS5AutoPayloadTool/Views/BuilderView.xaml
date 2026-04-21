@@ -130,7 +130,7 @@
               AllowDrop="True" SelectionMode="Single"
               PreviewMouseLeftButtonDown="OnStepMouseDown"
               PreviewMouseMove="OnStepMouseMove"
-              Drop="OnStepDrop" DragOver="OnStepDragOver">
+              Drop="OnStepDrop" DragOver="OnStepDragOver" DragLeave="OnStepDragLeave">
       <ListView.ItemContainerStyle>
         <Style TargetType="ListViewItem">
           <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -148,7 +148,12 @@
       </ListView.ItemContainerStyle>
       <ListView.ItemTemplate>
         <DataTemplate>
-          <Border Background="{StaticResource BgCard}" CornerRadius="8" Padding="12,10">
+          <StackPanel>
+            <!-- Drop indicator (insertion line above target step) -->
+            <Border Height="3" Background="{StaticResource Accent}" CornerRadius="2" Margin="0,0,0,4"
+                    Visibility="{Binding DropIndicatorVisibility}"/>
+            <Border Background="{StaticResource BgCard}" CornerRadius="8" Padding="12,10"
+                    BorderBrush="{StaticResource Border}" BorderThickness="1">
             <Grid>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -216,6 +221,7 @@
               </Border>
             </Grid>
           </Border>
+          </StackPanel>
         </DataTemplate>
       </ListView.ItemTemplate>
     </ListView>

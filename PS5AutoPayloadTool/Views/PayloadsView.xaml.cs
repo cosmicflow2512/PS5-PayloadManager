@@ -44,6 +44,10 @@ public partial class PayloadsView : UserControl
             var upd = _updates.FirstOrDefault(u => u.Filename == p.Name);
             var badgeColor = ext switch { "lua" => new SolidColorBrush(Color.FromRgb(139, 92, 246)), "elf" => new SolidColorBrush(Color.FromRgb(59, 130, 246)), _ => new SolidColorBrush(Color.FromRgb(107, 114, 128)) };
 
+            bool hasRepo     = !string.IsNullOrEmpty(p.Repo);
+            bool hasVersions = hasRepo && p.AllVersions.Count > 1;
+            string verDisplay = string.IsNullOrEmpty(p.Version) ? "Latest" : p.Version;
+
             var vm = new PayloadVM
             {
                 Name         = p.Name,
@@ -51,17 +55,20 @@ public partial class PayloadsView : UserControl
                 BadgeColor   = badgeColor,
                 SizeText     = FormatBytes(p.Size) + " • " + p.Modified.ToLocalTime().ToString("MMM dd HH:mm"),
                 RepoText     = p.Repo,
-                HasRepo      = !string.IsNullOrEmpty(p.Repo),
-                HasVersions  = p.AllVersions.Count > 1,
-                VersionTags  = p.AllVersions.Count > 1 ? p.AllVersions.Select(v => v.Tag).ToList() : [],
+                HasRepo      = hasRepo,
+                HasVersions  = hasVersions,
+                VersionTags  = hasVersions ? p.AllVersions.Select(v => v.Tag).ToList() : [],
+                VersionText  = verDisplay,
                 SelectedVersion = p.Version,
+                SingleVersionVisibility = hasRepo && !hasVersions ? Visibility.Visible : Visibility.Collapsed,
+                LocalVisibility = hasRepo ? Visibility.Collapsed : Visibility.Visible,
                 IsSelected   = _selected.Contains(p.Name),
                 FavStar      = isFav ? "⭐" : "☆",
                 FavColor     = isFav ? Brushes.Gold : (Brush)(Application.Current.FindResource("TextMuted")),
                 HasUpdate    = upd != null,
                 UpdateLabel  = upd != null ? $"↑ {upd.NewVersion}" : "",
                 UpdateBadgeVisibility = upd != null ? Visibility.Visible : Visibility.Collapsed,
-                UpToDateVisibility = !string.IsNullOrEmpty(p.Repo) && upd == null ? Visibility.Visible : Visibility.Collapsed,
+                UpToDateVisibility = hasRepo && upd == null && hasVersions ? Visibility.Visible : Visibility.Collapsed,
                 AllVersions  = p.AllVersions,
                 DownloadUrl  = p.DownloadUrl,
                 UpdateResult = upd,
@@ -190,6 +197,9 @@ public partial class PayloadsView : UserControl
         if (cb.SelectedItem is not string tag) return;
         var vm = _rows.FirstOrDefault(r => r.Name == name);
         if (vm == null) return;
+        // Skip the initial selection-sync that fires when the ComboBox binds to the current version.
+        var current = Storage.LoadPayloadMeta().TryGetValue(name, out var m) ? m.Version : "";
+        if (tag == current) return;
         var ver = vm.AllVersions.FirstOrDefault(v => v.Tag == tag);
         if (ver == null) return;
         LogBus.Log($"Switching {name} to {tag}…", LogLevel.Info);
@@ -247,6 +257,9 @@ public class PayloadVM : INotifyPropertyChanged
     public bool   HasVersions { get; set; }
     public List<string> VersionTags { get; set; } = [];
     public string SelectedVersion   { get; set; } = "";
+    public string VersionText { get; set; } = "";
+    public Visibility SingleVersionVisibility { get; set; } = Visibility.Collapsed;
+    public Visibility LocalVisibility         { get; set; } = Visibility.Collapsed;
     public string FavStar  { get; set; } = "☆";
     public Brush  FavColor { get; set; } = Brushes.Gray;
     public bool HasUpdate  { get; set; }
