@@ -1,0 +1,140 @@
+{
+  "name": "Maik Fixes (Super PLDMGR 404)",
+  "payloads": [
+    {
+      "name": "A53 Kstuff Shadowmountplus 3In1",
+      "filename": "A53-Kstuff-ShadowMountPlus-3in1.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/A53-Kstuff-ShadowMountPlus-3in1.elf",
+      "description": "Experimental AIO by SoNic credit to EchoStrech DarkMor",
+      "version": "experimental",
+      "category": "PS5 Beta",
+      "checksum": "51f5c7973a2edb5db61bcbfb7afc3d2336f19368631f84bfc55d08ef4a3d4ab2"
+    },
+    {
+      "name": "A53 Kstuff Smp",
+      "filename": "A53-kstuff-SMP.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/A53-kstuff-SMP.elf",
+      "description": "Experimental AIO by SoNic credit to EchoStrech DarkMor",
+      "version": "experimental",
+      "category": "PS5 Beta",
+      "checksum": "98fd2462262b6c3e46f8f5f44672ee50c5c3f8718b9a3281ae8220f05a06d3dc"
+    },
+    {
+      "name": "A53 Ppr Install 1140 20.09",
+      "filename": "a53_ppr_install_1140_20.09.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/a53_ppr_install_1140_20.09.elf",
+      "description": "a53_ppr_install_1140_20.09.elf - support 1.00-11.40",
+      "version": "20.09",
+      "category": "PS5 Beta",
+      "checksum": "5d664382ea83e11f0326d9f0544af215a9f329e27fbd1edc483446e0d7b8ee13"
+    },
+    {
+      "name": "A53 Ppr Install 1160 20.09",
+      "filename": "a53_ppr_install_1160_20.09.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/a53_ppr_install_1160_20.09.elf",
+      "description": "a53_ppr_install_1160_20.09.elf - 11.60 only",
+      "version": "20.09",
+      "category": "PS5 Beta",
+      "checksum": "984be03548aa849bcd06757acbed5575a3764532d858f4afaaa243b9f2a08bbf"
+    },
+    {
+      "name": "Kstuff 1.13 Fpkg Dr Test3",
+      "filename": "kstuff-1.13-fpkg-dr-test3.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/kstuff-1.13-fpkg-dr-test3.elf",
+      "description": "Experimental Kstuff DarkMor - kstuff-1.13-fpkg-dr-test3",
+      "version": "1.13-fpkg-dr-test3",
+      "category": "PS5 Beta",
+      "checksum": "84a31b1ce27036fc1edd5d94ac2c057aab24ada81e0f476e96ad60111136c9e0"
+    },
+    {
+      "name": "Kstuff Ng",
+      "filename": "Kstuff-NG_v1.00.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/Kstuff-NG_v1.00.elf",
+      "description": "Experimental Kstuff NG",
+      "version": "v1.00",
+      "category": "PS5 Beta",
+      "checksum": "77c7a96783de94201417630cf57bdec3d7eebd047dfb96d8f144c3590359256f"
+    },
+    {
+      "name": "Elf Launcher",
+      "filename": "elf-launcher_v1.0.3.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/elf-launcher_v1.0.3.elf",
+      "description": "PS5 launcher for ELF payloads.",
+      "version": "v1.0.3",
+      "category": "PS5 HEN Loader",
+      "checksum": "0b18a6c974b11709268315af9d61c501545fce1cfb884815c9a21b1f62d4fa47"
+    },
+    {
+      "name": "Pkg Manager",
+      "filename": "pkg-manager_v1.4.1.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/pkg-manager_v1.4.1.elf",
+      "description": "A clean and intuitive package manager for PlayStation 5",
+      "version": "v1.4.1",
+      "category": "PS5 Pkg Tool",
+      "checksum": "09adaff13b858bb3db519faaea673ee3fa67298081e608d32f6501ed6e9f706e"
+    },
+    {
+      "name": "Pkg Receiver",
+      "filename": "pkg-receiver_v1.2.8.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/pkg-receiver_v1.2.8.elf",
+      "description": "A package manager for PlayStation 5 need PkgSender android app or windows app",
+      "version": "v1.2.8",
+      "category": "PS5 Pkg Tool",
+      "checksum": "6946d52c6c04a3f43d3141a505394ba8e0c6923f17fe471054e11567c9a526c7"
+    },
+    {
+      "name": "Memdbg",
+      "filename": "MemDBG_vnightly-20260922-g6e493c9.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/MemDBG_vnightly-20260922-g6e493c9.elf",
+      "description": "Memory debugging and inspection suite.",
+      "version": "nightly-20260922-g6e493c9",
+      "category": "PS5 Sdk Debug",
+      "checksum": "b87f14d98efbe1b892fe5d660eee3751b1459097a4c4475bab98c85cf8f75831"
+    },
+    {
+      "name": "Ps5Upload",
+      "filename": "ps5upload_v5.36.0.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/ps5upload_v5.36.0.elf",
+      "description": "PS5 Upload server / tool. Port: 9025",
+      "version": "v5.36.0",
+      "category": "PS5 Server",
+      "checksum": "b1a10ae2b55ae8929681941991535226610d3fe2af9454a34d260e5884c8d336"
+    },
+    {
+      "name": "Fgg Playpods",
+      "filename": "FGG-PlayPods_v1.0.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/FGG-PlayPods_v1.0.elf",
+      "description": "Hear your PlayStation 5 on an ordinary Bluetooth headset.",
+      "version": "1.0",
+      "category": "PS5 Utility",
+      "checksum": "9ee1958ec24e4a927992fea9ee202f5a173756091bd3abc02ebf4d2d686211a4"
+    },
+    {
+      "name": "Fgg Unpack",
+      "filename": "FGG-Unpack_v0.1.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/FGG-Unpack_v0.1.elf",
+      "description": "Extract .zip and .7z archives directly on a jailbroken PlayStation 5.",
+      "version": "v0.1",
+      "category": "PS5 Utility",
+      "checksum": "e8c8e57bbda31b5d16d131797aac6f83b555cae8d439b1f475c952f3d9554eff"
+    },
+    {
+      "name": "Fgg Xsense",
+      "filename": "FGG-XSense_v1.1.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/FGG-XSense_v1.1.elf",
+      "description": "Use an Xbox controller on a jailbroken PlayStation 5.",
+      "version": "1.1",
+      "category": "PS5 Utility",
+      "checksum": "55195ccb02fbdbfa002e9188b0eff72d7d2e6de6c7a1c91666f88c6c9ff0d6c0"
+    },
+    {
+      "name": "Ghost Toothapi",
+      "filename": "ghost-toothAPI.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/ghost-toothAPI.elf",
+      "description": "ghost-toothAPI.",
+      "version": "Source-Fixe",
+      "category": "PS5 Utility",
+      "checksum": "744277a72a268871284ad3b91565968df06c57c0acdabd921c8712e6de731f99"
+    }
+  ]
+}
