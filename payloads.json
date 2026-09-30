@@ -47,6 +47,15 @@
       "checksum": "84a31b1ce27036fc1edd5d94ac2c057aab24ada81e0f476e96ad60111136c9e0"
     },
     {
+      "name": "Kstuff 1.13 Fpkg Dr Test5",
+      "filename": "kstuff-1.13-fpkg-dr-test5.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/kstuff-1.13-fpkg-dr-test5.elf",
+      "description": "Experimental Kstuff Lite DarkMor - kstuff-1.13-fpkg-dr-test5 (manuell hinzugefuegt)",
+      "version": "1.13-fpkg-dr-test5",
+      "category": "PS5 Beta",
+      "checksum": "829b45fe871dd64fbd53874ae4558076c2f1e1f203fe1ab52db5510d5fc45923"
+    },
+    {
       "name": "Kstuff Ng",
       "filename": "Kstuff-NG_v1.00.elf",
       "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/Kstuff-NG_v1.00.elf",
