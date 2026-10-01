@@ -146,11 +146,11 @@
       "checksum": "55195ccb02fbdbfa002e9188b0eff72d7d2e6de6c7a1c91666f88c6c9ff0d6c0"
     },
     {
-      "name": "Ghost Toothapi",
+      "name": "ghost-toothAPI",
       "filename": "ghost-toothAPI.elf",
       "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/ghost-toothAPI.elf",
-      "description": "ghost-toothAPI.",
-      "version": "Source-Fixe",
+      "description": "Bluetooth-Audio (A2DP, SBC) fuer normale BT-Headsets/AirPods - Game- und System-Sound, DualSense bleibt verbunden. Headset in Pairing-Modus, ELF senden, ~10 s Scan. Kein Mic/Party-Chat. Log: /data/ghost-toothAPI/ghost-toothAPI.log",
+      "version": "v0.01",
       "category": "PS5 Utility",
       "checksum": "744277a72a268871284ad3b91565968df06c57c0acdabd921c8712e6de731f99"
     }
