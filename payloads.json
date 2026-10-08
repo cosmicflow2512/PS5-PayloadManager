@@ -153,6 +153,15 @@
       "version": "v0.01",
       "category": "PS5 Utility",
       "checksum": "744277a72a268871284ad3b91565968df06c57c0acdabd921c8712e6de731f99"
+    },
+    {
+      "name": "Webkit-Autoloader-Installer",
+      "filename": "webkit-autoloader-installer_v0.6.1.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/webkit-autoloader-installer_v0.6.1.elf",
+      "description": "Installs WebKit Autoloader on homescreen (itsPLK, v0.6.1, manuell hinzugefuegt)",
+      "version": "v0.6.1",
+      "category": "Ps5-Webkit-Autoloader",
+      "checksum": "f662c75a502e4f1bc41b055dcb490625f8222c499ce437dc80f439a3a279e93f"
     }
   ]
 }
