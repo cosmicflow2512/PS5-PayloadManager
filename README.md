@@ -15,6 +15,7 @@ https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloa
 - kstuff-1.13-fpkg-dr-test5: manuell hinzugefügt (Upload von Maik, 2026-09-30)
 - ShadowMountPlus 1.7beta5: aus dem offiziellen Release https://github.com/drakmor/ShadowMountPlus/releases/tag/1.7beta5 (2026-10-10, ersetzt 1.7beta4)
 - webkit-autoloader-installer v0.6.1: manuell hinzugefügt (Upload von Maik, 2026-10-08)
+- pkg-manager v1.5.1: aus dem offiziellen Release https://github.com/itsPLK/ps5-pkg-manager/releases/tag/v1.5.1 (2026-10-10, ersetzt v1.4.1)
 - Übrige: aus `ps5_super_pldmgr_auto_updated_offline.aio_latest.zip` (Release `latest`, Build 2026-09-28 02:20 UTC), SHA-256 identisch mit dem nexgen999-Feed
 
 Alle Dateien haben einen gültigen ELF-Header; `checksum` ist der SHA-256 der hier gehosteten Datei.
