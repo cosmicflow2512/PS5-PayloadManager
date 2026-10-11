@@ -66,12 +66,12 @@
     },
     {
       "name": "ShadowMountPlus",
-      "filename": "ShadowMountPlus_v1.7beta5.elf",
-      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/ShadowMountPlus_v1.7beta5.elf",
-      "description": "ShadowMountPlus payload for game mounting (1.7beta5, aus drakmor/ShadowMountPlus Release)",
-      "version": "1.7beta5",
+      "filename": "ShadowMountPlus_v1.7beta5fix1.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/ShadowMountPlus_v1.7beta5fix1.elf",
+      "description": "ShadowMountPlus payload for game mounting (1.7beta5-fix1, aus drakmor/ShadowMountPlus Release)",
+      "version": "1.7beta5fix1",
       "category": "PS5 Game Dump",
-      "checksum": "0d54a8467ec3544e1c7b365c9f100b2bf42bf4633cb768bde7c8f16b6cfb5375"
+      "checksum": "e85fd63b705498488f39c09c9aea6f9fa22e0df2e932865de49a8cedf25172d5"
     },
     {
       "name": "Elf Launcher",
