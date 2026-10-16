@@ -8,7 +8,9 @@
       "description": "Experimental AIO by SoNic credit to EchoStrech DarkMor",
       "version": "experimental",
       "category": "PS5 Beta",
-      "checksum": "51f5c7973a2edb5db61bcbfb7afc3d2336f19368631f84bfc55d08ef4a3d4ab2"
+      "checksum": "51f5c7973a2edb5db61bcbfb7afc3d2336f19368631f84bfc55d08ef4a3d4ab2",
+      "id": "a53-kstuff-smp-3in1",
+      "author": "SoNic"
     },
     {
       "name": "A53 Kstuff Smp",
@@ -17,7 +19,9 @@
       "description": "Experimental AIO by SoNic credit to EchoStrech DarkMor",
       "version": "experimental",
       "category": "PS5 Beta",
-      "checksum": "98fd2462262b6c3e46f8f5f44672ee50c5c3f8718b9a3281ae8220f05a06d3dc"
+      "checksum": "98fd2462262b6c3e46f8f5f44672ee50c5c3f8718b9a3281ae8220f05a06d3dc",
+      "id": "a53-kstuff-smp",
+      "author": "SoNic"
     },
     {
       "name": "A53 Ppr Install 1140 20.09",
@@ -26,7 +30,9 @@
       "description": "a53_ppr_install_1140_20.09.elf - support 1.00-11.40",
       "version": "20.09",
       "category": "PS5 Beta",
-      "checksum": "5d664382ea83e11f0326d9f0544af215a9f329e27fbd1edc483446e0d7b8ee13"
+      "checksum": "5d664382ea83e11f0326d9f0544af215a9f329e27fbd1edc483446e0d7b8ee13",
+      "id": "a53-ppr-install-1140",
+      "author": "drakmor"
     },
     {
       "name": "A53 Ppr Install 1160 20.09",
@@ -35,7 +41,9 @@
       "description": "a53_ppr_install_1160_20.09.elf - 11.60 only",
       "version": "20.09",
       "category": "PS5 Beta",
-      "checksum": "984be03548aa849bcd06757acbed5575a3764532d858f4afaaa243b9f2a08bbf"
+      "checksum": "984be03548aa849bcd06757acbed5575a3764532d858f4afaaa243b9f2a08bbf",
+      "id": "a53-ppr-install-1160",
+      "author": "drakmor"
     },
     {
       "name": "Kstuff 1.13 Fpkg Dr Test",
@@ -44,7 +52,9 @@
       "description": "Experimental Kstuff Lite DarkMor - kstuff-fpkg-1.13-dr-test6 (manuell hinzugefuegt)",
       "version": "1.13-fpkg-dr-test6",
       "category": "PS5 Beta",
-      "checksum": "b1f60c1ec1685904d396da16710dc9d5676bf0880abf74c65459c886010b9443"
+      "checksum": "b1f60c1ec1685904d396da16710dc9d5676bf0880abf74c65459c886010b9443",
+      "id": "kstuff-1.13-dr-test",
+      "author": "drakmor"
     },
     {
       "name": "Kstuff 1.13 Fpkg Dr Test3",
@@ -53,7 +63,9 @@
       "description": "Experimental Kstuff DarkMor - kstuff-1.13-fpkg-dr-test3",
       "version": "1.13-fpkg-dr-test3",
       "category": "PS5 Beta",
-      "checksum": "84a31b1ce27036fc1edd5d94ac2c057aab24ada81e0f476e96ad60111136c9e0"
+      "checksum": "84a31b1ce27036fc1edd5d94ac2c057aab24ada81e0f476e96ad60111136c9e0",
+      "id": "kstuff-1.13-dr-test3",
+      "author": "drakmor"
     },
     {
       "name": "Kstuff Ng",
@@ -62,7 +74,9 @@
       "description": "Experimental Kstuff NG",
       "version": "v1.00",
       "category": "PS5 Beta",
-      "checksum": "77c7a96783de94201417630cf57bdec3d7eebd047dfb96d8f144c3590359256f"
+      "checksum": "77c7a96783de94201417630cf57bdec3d7eebd047dfb96d8f144c3590359256f",
+      "id": "kstuff-ng",
+      "author": "EchoStretch"
     },
     {
       "name": "ShadowMountPlus",
@@ -71,7 +85,10 @@
       "description": "ShadowMountPlus payload for game mounting (1.7beta5-fix1, aus drakmor/ShadowMountPlus Release)",
       "version": "1.7beta5fix1",
       "category": "PS5 Game Dump",
-      "checksum": "e85fd63b705498488f39c09c9aea6f9fa22e0df2e932865de49a8cedf25172d5"
+      "checksum": "e85fd63b705498488f39c09c9aea6f9fa22e0df2e932865de49a8cedf25172d5",
+      "id": "shadowmountplus",
+      "author": "drakmor",
+      "source": "https://github.com/drakmor/ShadowMountPlus/releases"
     },
     {
       "name": "Elf Launcher",
@@ -80,7 +97,22 @@
       "description": "ELF Launcher (X-F1REBALL-X) v2.0.5, aus offiziellem Release",
       "version": "v2.0.5",
       "category": "PS5 HEN Loader",
-      "checksum": "1b4494e669ef07525c77036777d36a20f1eb81a708fe8262b26ffffa9452f547"
+      "checksum": "1b4494e669ef07525c77036777d36a20f1eb81a708fe8262b26ffffa9452f547",
+      "id": "elf-launcher",
+      "author": "X-F1REBALL-X",
+      "source": "https://github.com/X-F1REBALL-X/elf-launcher/releases"
+    },
+    {
+      "name": "PS5 Payload Manager",
+      "filename": "pldmgr_v0.6.1.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/pldmgr_v0.6.1.elf",
+      "version": "v0.6.1",
+      "category": "PS5 HEN Loader",
+      "description": "PS5 Payload Manager (itsPLK) v0.6.1, aus offiziellem Release",
+      "checksum": "5165cbe4c13360828bd0f5d558cdbb9e2d55b0660b1dc7f7a58d3f4ee9e23285",
+      "id": "pldmgr",
+      "author": "itsPLK",
+      "source": "https://github.com/itsPLK/ps5-payload-manager/releases"
     },
     {
       "name": "Kstuff-A53 SoNic",
@@ -89,7 +121,10 @@
       "description": "kstuff-lite + A53/PPR-Patches + BackPork in einem ELF (Soonniicc). EXPERIMENTELL, nur FW 5.00 getestet. Kein zweites BackPork/kstuff dazu laden",
       "version": "1.4",
       "category": "PS5 Kstuff",
-      "checksum": "675bef691b1bd1ee14956409aa3947ef9fd52dc36034dbd18d7c55d469e08d23"
+      "checksum": "675bef691b1bd1ee14956409aa3947ef9fd52dc36034dbd18d7c55d469e08d23",
+      "id": "kstuff-a53-sonic",
+      "author": "Soonniicc",
+      "source": "https://github.com/Soonniicc/kstuff-a53/releases"
     },
     {
       "name": "Pkg Manager",
@@ -98,7 +133,10 @@
       "description": "PS5 PKG Manager (itsPLK) v1.5.1, aus offiziellem Release",
       "version": "v1.5.1",
       "category": "PS5 Pkg Tool",
-      "checksum": "82e3548edcc41419b644482cccaef65689334fc0315dc20247f48b90bf182dca"
+      "checksum": "82e3548edcc41419b644482cccaef65689334fc0315dc20247f48b90bf182dca",
+      "id": "pkg-manager",
+      "author": "itsPLK",
+      "source": "https://github.com/itsPLK/ps5-pkg-manager/releases"
     },
     {
       "name": "Pkg Receiver",
@@ -107,7 +145,10 @@
       "description": "A package manager for PlayStation 5 need PkgSender android app or windows app",
       "version": "v1.2.8",
       "category": "PS5 Pkg Tool",
-      "checksum": "6946d52c6c04a3f43d3141a505394ba8e0c6923f17fe471054e11567c9a526c7"
+      "checksum": "6946d52c6c04a3f43d3141a505394ba8e0c6923f17fe471054e11567c9a526c7",
+      "id": "pkg-receiver",
+      "author": "Loopayeh",
+      "source": "https://github.com/Loopayeh/pkg-sender/releases"
     },
     {
       "name": "Memdbg",
@@ -116,7 +157,10 @@
       "description": "MemDBG PS5 payload (seregonwar), nightly 2026-09-30, aus offiziellem Release",
       "version": "nightly-20260930-g6e493c9",
       "category": "PS5 Sdk Debug",
-      "checksum": "2fbdc9f0b21043619b1c32b512df47b3ddf79a99f096243c0d48f5ffc14e1906"
+      "checksum": "2fbdc9f0b21043619b1c32b512df47b3ddf79a99f096243c0d48f5ffc14e1906",
+      "id": "memdbg",
+      "author": "seregonwar",
+      "source": "https://github.com/seregonwar/MemDBG/releases"
     },
     {
       "name": "Ps5Upload",
@@ -125,7 +169,10 @@
       "description": "PS5 Upload server (phantomptr) v7.0.27, aus offiziellem Release. Port: 9025",
       "version": "v7.0.27",
       "category": "PS5 Server",
-      "checksum": "855f106a64a6e8a1ec0a3fac65e21585f209c9d6751995def04ee551b90a61ea"
+      "checksum": "855f106a64a6e8a1ec0a3fac65e21585f209c9d6751995def04ee551b90a61ea",
+      "id": "ps5upload",
+      "author": "phantomptr",
+      "source": "https://github.com/phantomptr/ps5upload/releases"
     },
     {
       "name": "FGG PlayPods GUI",
@@ -134,7 +181,10 @@
       "description": "Fork von FGG-PlayPods (menfis911): BT-Audio A2DP/SBC ueber den PS5-Controller. Nicht gleichzeitig mit FGG-PlayPods/ghost-toothAPI. Log: /data/fgg-playpods/playpods.log. Getestet nur FW 13.60",
       "version": "v0.1.5",
       "category": "PS5 Utility",
-      "checksum": "af438dbd138d34ea452db94057d6594b61eafb0692a1bc95d029adfbdc9a61fa"
+      "checksum": "af438dbd138d34ea452db94057d6594b61eafb0692a1bc95d029adfbdc9a61fa",
+      "id": "fgg-playpods-gui",
+      "author": "menfis911",
+      "source": "https://github.com/menfis911/FGG-PlayPods-GUI/releases"
     },
     {
       "name": "Fgg Playpods",
@@ -143,7 +193,10 @@
       "description": "Hear your PlayStation 5 on an ordinary Bluetooth headset.",
       "version": "1.0",
       "category": "PS5 Utility",
-      "checksum": "9ee1958ec24e4a927992fea9ee202f5a173756091bd3abc02ebf4d2d686211a4"
+      "checksum": "9ee1958ec24e4a927992fea9ee202f5a173756091bd3abc02ebf4d2d686211a4",
+      "id": "fgg-playpods",
+      "author": "FGGstore",
+      "source": "https://github.com/FGGstore/FGG-PlayPods/releases"
     },
     {
       "name": "Fgg Unpack",
@@ -152,7 +205,10 @@
       "description": "Extract .zip and .7z archives directly on a jailbroken PlayStation 5.",
       "version": "v0.1",
       "category": "PS5 Utility",
-      "checksum": "e8c8e57bbda31b5d16d131797aac6f83b555cae8d439b1f475c952f3d9554eff"
+      "checksum": "e8c8e57bbda31b5d16d131797aac6f83b555cae8d439b1f475c952f3d9554eff",
+      "id": "fgg-unpack",
+      "author": "FGGstore",
+      "source": "https://github.com/FGGstore/FGG-Unpack/releases"
     },
     {
       "name": "Fgg Xsense",
@@ -161,7 +217,10 @@
       "description": "Use an Xbox controller on a jailbroken PlayStation 5.",
       "version": "1.1",
       "category": "PS5 Utility",
-      "checksum": "55195ccb02fbdbfa002e9188b0eff72d7d2e6de6c7a1c91666f88c6c9ff0d6c0"
+      "checksum": "55195ccb02fbdbfa002e9188b0eff72d7d2e6de6c7a1c91666f88c6c9ff0d6c0",
+      "id": "fgg-xsense",
+      "author": "FGGstore",
+      "source": "https://github.com/FGGstore/FGG-XSense/releases"
     },
     {
       "name": "ghost-toothAPI",
@@ -170,7 +229,9 @@
       "description": "Bluetooth-Audio (A2DP, SBC) fuer normale BT-Headsets/AirPods - Game- und System-Sound, DualSense bleibt verbunden. Headset in Pairing-Modus, ELF senden, ~10 s Scan. Kein Mic/Party-Chat. Log: /data/ghost-toothAPI/ghost-toothAPI.log",
       "version": "v0.01",
       "category": "PS5 Utility",
-      "checksum": "744277a72a268871284ad3b91565968df06c57c0acdabd921c8712e6de731f99"
+      "checksum": "744277a72a268871284ad3b91565968df06c57c0acdabd921c8712e6de731f99",
+      "id": "ghost-toothapi",
+      "author": "StonedModder"
     },
     {
       "name": "Webkit-Autoloader-Installer",
@@ -179,7 +240,10 @@
       "description": "Installs WebKit Autoloader on homescreen (itsPLK, v0.6.1, manuell hinzugefuegt)",
       "version": "v0.6.1",
       "category": "Ps5-Webkit-Autoloader",
-      "checksum": "f662c75a502e4f1bc41b055dcb490625f8222c499ce437dc80f439a3a279e93f"
+      "checksum": "f662c75a502e4f1bc41b055dcb490625f8222c499ce437dc80f439a3a279e93f",
+      "id": "webkit-autoloader-installer",
+      "author": "itsPLK",
+      "source": "https://github.com/itsPLK/ps5-webkit-autoloader/releases"
     }
   ]
 }
