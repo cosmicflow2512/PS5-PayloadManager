@@ -75,12 +75,12 @@
     },
     {
       "name": "Elf Launcher",
-      "filename": "elf-launcher_v1.0.3.elf",
-      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/elf-launcher_v1.0.3.elf",
-      "description": "PS5 launcher for ELF payloads.",
-      "version": "v1.0.3",
+      "filename": "elf-launcher_v2.0.5.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/elf-launcher_v2.0.5.elf",
+      "description": "ELF Launcher (X-F1REBALL-X) v2.0.5, aus offiziellem Release",
+      "version": "v2.0.5",
       "category": "PS5 HEN Loader",
-      "checksum": "0b18a6c974b11709268315af9d61c501545fce1cfb884815c9a21b1f62d4fa47"
+      "checksum": "1b4494e669ef07525c77036777d36a20f1eb81a708fe8262b26ffffa9452f547"
     },
     {
       "name": "Pkg Manager",
@@ -102,21 +102,21 @@
     },
     {
       "name": "Memdbg",
-      "filename": "MemDBG_vnightly-20260922-g6e493c9.elf",
-      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/MemDBG_vnightly-20260922-g6e493c9.elf",
-      "description": "Memory debugging and inspection suite.",
-      "version": "nightly-20260922-g6e493c9",
+      "filename": "MemDBG_vnightly-20260930-g6e493c9.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/MemDBG_vnightly-20260930-g6e493c9.elf",
+      "description": "MemDBG PS5 payload (seregonwar), nightly 2026-09-30, aus offiziellem Release",
+      "version": "nightly-20260930-g6e493c9",
       "category": "PS5 Sdk Debug",
-      "checksum": "b87f14d98efbe1b892fe5d660eee3751b1459097a4c4475bab98c85cf8f75831"
+      "checksum": "2fbdc9f0b21043619b1c32b512df47b3ddf79a99f096243c0d48f5ffc14e1906"
     },
     {
       "name": "Ps5Upload",
-      "filename": "ps5upload_v5.36.0.elf",
-      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/ps5upload_v5.36.0.elf",
-      "description": "PS5 Upload server / tool. Port: 9025",
-      "version": "v5.36.0",
+      "filename": "ps5upload_v7.0.27.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/ps5upload_v7.0.27.elf",
+      "description": "PS5 Upload server (phantomptr) v7.0.27, aus offiziellem Release. Port: 9025",
+      "version": "v7.0.27",
       "category": "PS5 Server",
-      "checksum": "b1a10ae2b55ae8929681941991535226610d3fe2af9454a34d260e5884c8d336"
+      "checksum": "855f106a64a6e8a1ec0a3fac65e21585f209c9d6751995def04ee551b90a61ea"
     },
     {
       "name": "Fgg Playpods",
