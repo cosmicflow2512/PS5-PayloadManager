@@ -38,15 +38,6 @@
       "checksum": "984be03548aa849bcd06757acbed5575a3764532d858f4afaaa243b9f2a08bbf"
     },
     {
-      "name": "Kstuff 1.13 Fpkg Dr Test3",
-      "filename": "kstuff-1.13-fpkg-dr-test3.elf",
-      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/kstuff-1.13-fpkg-dr-test3.elf",
-      "description": "Experimental Kstuff DarkMor - kstuff-1.13-fpkg-dr-test3",
-      "version": "1.13-fpkg-dr-test3",
-      "category": "PS5 Beta",
-      "checksum": "84a31b1ce27036fc1edd5d94ac2c057aab24ada81e0f476e96ad60111136c9e0"
-    },
-    {
       "name": "Kstuff 1.13 Fpkg Dr Test",
       "filename": "kstuff-1.13-fpkg-dr-test6.elf",
       "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/kstuff-1.13-fpkg-dr-test6.elf",
@@ -54,6 +45,15 @@
       "version": "1.13-fpkg-dr-test6",
       "category": "PS5 Beta",
       "checksum": "b1f60c1ec1685904d396da16710dc9d5676bf0880abf74c65459c886010b9443"
+    },
+    {
+      "name": "Kstuff 1.13 Fpkg Dr Test3",
+      "filename": "kstuff-1.13-fpkg-dr-test3.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/kstuff-1.13-fpkg-dr-test3.elf",
+      "description": "Experimental Kstuff DarkMor - kstuff-1.13-fpkg-dr-test3",
+      "version": "1.13-fpkg-dr-test3",
+      "category": "PS5 Beta",
+      "checksum": "84a31b1ce27036fc1edd5d94ac2c057aab24ada81e0f476e96ad60111136c9e0"
     },
     {
       "name": "Kstuff Ng",
@@ -81,6 +81,15 @@
       "version": "v2.0.5",
       "category": "PS5 HEN Loader",
       "checksum": "1b4494e669ef07525c77036777d36a20f1eb81a708fe8262b26ffffa9452f547"
+    },
+    {
+      "name": "Kstuff-A53 SoNic",
+      "filename": "kstuff-a53_SoNic_v1.4.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/kstuff-a53_SoNic_v1.4.elf",
+      "description": "kstuff-lite + A53/PPR-Patches + BackPork in einem ELF (Soonniicc). EXPERIMENTELL, nur FW 5.00 getestet. Kein zweites BackPork/kstuff dazu laden",
+      "version": "1.4",
+      "category": "PS5 Kstuff",
+      "checksum": "675bef691b1bd1ee14956409aa3947ef9fd52dc36034dbd18d7c55d469e08d23"
     },
     {
       "name": "Pkg Manager",
@@ -117,6 +126,15 @@
       "version": "v7.0.27",
       "category": "PS5 Server",
       "checksum": "855f106a64a6e8a1ec0a3fac65e21585f209c9d6751995def04ee551b90a61ea"
+    },
+    {
+      "name": "FGG PlayPods GUI",
+      "filename": "FGG-PlayPods-GUI_v0.1.5.elf",
+      "url": "https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloads/FGG-PlayPods-GUI_v0.1.5.elf",
+      "description": "Fork von FGG-PlayPods (menfis911): BT-Audio A2DP/SBC ueber den PS5-Controller. Nicht gleichzeitig mit FGG-PlayPods/ghost-toothAPI. Log: /data/fgg-playpods/playpods.log. Getestet nur FW 13.60",
+      "version": "v0.1.5",
+      "category": "PS5 Utility",
+      "checksum": "af438dbd138d34ea452db94057d6594b61eafb0692a1bc95d029adfbdc9a61fa"
     },
     {
       "name": "Fgg Playpods",

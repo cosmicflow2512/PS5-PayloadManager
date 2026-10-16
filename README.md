@@ -17,6 +17,7 @@ https://raw.githubusercontent.com/cosmicflow2512/PS5-PayloadManager/store/payloa
 - webkit-autoloader-installer v0.6.1: manuell hinzugefügt (Upload von Maik, 2026-10-08)
 - pkg-manager v1.5.1: aus dem offiziellen Release https://github.com/itsPLK/ps5-pkg-manager/releases/tag/v1.5.1 (2026-10-10, ersetzt v1.4.1)
 - 2026-10-16 aus offiziellen Releases aktualisiert: ps5upload v7.0.27, elf-launcher v2.0.5, MemDBG nightly-20260930 (Vorversionen bleiben bis zum nächsten Update liegen)
+- 2026-10-16 neu aus offiziellen Releases: FGG-PlayPods-GUI v0.1.5 (menfis911), kstuff-a53 1.4 (Soonniicc)
 - Übrige: aus `ps5_super_pldmgr_auto_updated_offline.aio_latest.zip` (Release `latest`, Build 2026-09-28 02:20 UTC), SHA-256 identisch mit dem nexgen999-Feed
 
 Alle Dateien haben einen gültigen ELF-Header; `checksum` ist der SHA-256 der hier gehosteten Datei.
